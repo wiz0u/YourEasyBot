@@ -6,11 +6,12 @@ Here is an example bot asking sequential questions when the user sends **/start*
 
     public class MyBot : EasyBot
     {
-        public MyBot() : base("PASTE YOUR BOT TOKEN HERE") { }
+        public MyBot() : base(MyBotToken) { }
 
         public override async Task OnPrivateChat(Chat chat, User user, UpdateInfo update)
         {
-            if (update.UpdateKind != UpdateKind.NewMessage || update.MsgCategory != MsgCategory.Text) return;
+            if (update.UpdateKind != UpdateKind.NewMessage || update.MsgCategory != MsgCategory.Text)
+                return;
             if (update.Message.Text == "/start")
             {
                 await Telegram.SendTextMessageAsync(chat, "What is your first name?");
@@ -22,6 +23,8 @@ Here is an example bot asking sequential questions when the user sends **/start*
             }
         }
     }
+
+Clone the repository *(or download ZIP)* and open/modify **YourBot.cs** to view a longer example and start building your bot.
 
 # Available methods
 

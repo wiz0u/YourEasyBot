@@ -24,7 +24,8 @@ namespace YourEasyBot
 
 		public override async Task OnPrivateChat(Chat chat, User user, UpdateInfo update)
 		{
-			if (update.UpdateKind != UpdateKind.NewMessage || update.MsgCategory != MsgCategory.Text) return;
+			if (update.UpdateKind != UpdateKind.NewMessage || update.MsgCategory != MsgCategory.Text)
+				return;
 			if (update.Message.Text == "/start")
 			{
 				await Telegram.SendTextMessageAsync(chat, "What is your first name?");
