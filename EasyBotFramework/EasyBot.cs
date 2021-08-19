@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
@@ -8,27 +9,22 @@ using Telegram.Bot.Types.Enums;
 
 namespace YourEasyBot
 {
-	internal class EasyBot	// A fun way to code Telegram Bots, by Wizou
+	public class EasyBot	// A fun way to code Telegram Bots, by Wizou
 	{
-		public TelegramBotClient Telegram;
-		public User Me;
+		public readonly TelegramBotClient Telegram;
+		public User Me { get; private set; }
 		public string BotName => Me.Username;
 
 		private readonly CancellationTokenSource _cancel = new();
 		private readonly Dictionary<long, TaskInfo> _tasks = new();
 
-		public EasyBot(string botToken)
-		{
-			Telegram = new(botToken);
-		}
-
 		public virtual Task OnPrivateChat(Chat chat, User user, UpdateInfo update) => Task.CompletedTask;
 		public virtual Task OnGroupChat(Chat chat, UpdateInfo update) => Task.CompletedTask;
-		public virtual Task OnChannelEvent(Chat channel, UpdateInfo update) => Task.CompletedTask;
+		public virtual Task OnChannel(Chat channel, UpdateInfo update) => Task.CompletedTask;
 		public virtual Task OnOtherEvents(UpdateInfo update) => Task.CompletedTask;
 
+		public EasyBot(string botToken) => Telegram = new(botToken);
 		public void Run() => RunAsync().Wait();
-
 		public async Task RunAsync()
 		{
 			Me = await Telegram.GetMeAsync();
@@ -43,12 +39,14 @@ namespace YourEasyBot
 					messageOffset = update.Id + 1;
 					switch (update.Type)
 					{
-						case UpdateType.Message: HandleUpdate(update, update.Message.Chat, update.Message.From); break;
-						case UpdateType.EditedMessage: HandleUpdate(update, update.EditedMessage.Chat, update.EditedMessage.From); break;
-						case UpdateType.ChannelPost: HandleUpdate(update, update.ChannelPost.Chat, null); break;
-						case UpdateType.EditedChannelPost: HandleUpdate(update, update.EditedChannelPost.Chat, null); break;
-						case UpdateType.CallbackQuery: HandleUpdate(update, update.CallbackQuery.Message.Chat, null); break;
-						default: HandleUpdate(update, null, null); break;
+						case UpdateType.Message: HandleUpdate(update, UpdateKind.NewMessage, update.Message); break;
+						case UpdateType.EditedMessage: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage); break;
+						case UpdateType.ChannelPost: HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost); break;
+						case UpdateType.EditedChannelPost: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost); break;
+						case UpdateType.CallbackQuery: HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery.Message); break;
+						case UpdateType.MyChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember.Chat); break;
+						case UpdateType.ChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember.Chat); break;
+						default: HandleUpdate(update, UpdateKind.OtherUpdate); break;
 					}
 				}
 				if (Console.KeyAvailable)
@@ -58,38 +56,17 @@ namespace YourEasyBot
 			_cancel.Cancel();
 		}
 
-		private void HandleUpdate(Update update, Chat chat, User user)
+		private void HandleUpdate(Update update, UpdateKind updateKind, Message message = null, Chat chat = null)
 		{
 			TaskInfo taskInfo;
+			chat ??= message?.Chat;
 			long chatId = chat?.Id ?? 0;
 			lock (_tasks)
 				if (!_tasks.TryGetValue(chatId, out taskInfo))
 					_tasks[chatId] = taskInfo = new TaskInfo();
-			var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = UpdateInfo.Kind.OtherUpdate, Update = update };
-			switch (update.Type)
-			{
-				case UpdateType.Message:
-					updateInfo.UpdateKind = UpdateInfo.Kind.NewMessage;
-					updateInfo.Message = update.Message;
-					break;
-				case UpdateType.EditedMessage:
-					updateInfo.UpdateKind = UpdateInfo.Kind.EditedMessage;
-					updateInfo.Message = update.EditedMessage;
-					break;
-				case UpdateType.ChannelPost:
-					updateInfo.UpdateKind = UpdateInfo.Kind.NewMessage;
-					updateInfo.Message = update.ChannelPost;
-					break;
-				case UpdateType.EditedChannelPost:
-					updateInfo.UpdateKind = UpdateInfo.Kind.EditedMessage;
-					updateInfo.Message = update.EditedChannelPost;
-					break;
-				case UpdateType.CallbackQuery:
-					updateInfo.UpdateKind = UpdateInfo.Kind.CallbackQuery;
-					updateInfo.Message = update.CallbackQuery.Message;
-					updateInfo.CallbackData = update.CallbackQuery.Data;
-					break;
-			}
+			var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = updateKind, Update = update, Message = message };
+			if (update.Type is UpdateType.CallbackQuery)
+				updateInfo.CallbackData = update.CallbackQuery.Data;
 			if (taskInfo.Task != null)
 			{
 				lock (taskInfo.Updates)
@@ -99,15 +76,15 @@ namespace YourEasyBot
 			}
 			Func<Task> taskStarter = (chat?.Type) switch
 			{
-				ChatType.Private => () => OnPrivateChat(chat, user, updateInfo),
+				ChatType.Private => () => OnPrivateChat(chat, message?.From, updateInfo),
 				ChatType.Group or ChatType.Supergroup => () => OnGroupChat(chat, updateInfo),
-				ChatType.Channel => () => OnChannelEvent(chat, updateInfo),
+				ChatType.Channel => () => OnChannel(chat, updateInfo),
 				_ => () => OnOtherEvents(updateInfo),
 			};
 			taskInfo.Task = Task.Run(taskStarter).ContinueWith(t => taskInfo.Task = null);
 		}
 
-		public async Task<UpdateInfo.Kind> WaitNext(UpdateInfo update)
+		public async Task<UpdateKind> NextEvent(UpdateInfo update)
 		{
 			var newUpdate = await ((IGetNext)update).NextUpdate(_cancel.Token);
 			update.Message = newUpdate.Message;
@@ -116,9 +93,27 @@ namespace YourEasyBot
 			return update.UpdateKind = newUpdate.UpdateKind;
 		}
 
-		public async Task WaitNewMessage(UpdateInfo update)
+		public async Task<MsgCategory> NewMessage(UpdateInfo update)
 		{
-			while (await WaitNext(update) != UpdateInfo.Kind.NewMessage) { }
+			while (true)
+			{
+				switch (await NextEvent(update))
+				{
+					case UpdateKind.NewMessage
+						when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
+							return update.MsgCategory; // WaitNewMessage only returns for messages from these 3 categories
+					case UpdateKind.OtherUpdate
+						when update.Update.MyChatMember is ChatMemberUpdated
+						{ NewChatMember: { Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked } }:
+							throw new LeftTheChatException(); // abort the calling method
+				}
+			}
+		}
+
+		public async Task<string> NewTextMessage(UpdateInfo update)
+		{
+			while (await NewMessage(update) != MsgCategory.Text) { }
+			return update.Message.Text;
 		}
 
 		public void ReplyCallback(UpdateInfo update, string text = null)
@@ -127,5 +122,10 @@ namespace YourEasyBot
 				throw new InvalidOperationException("This method can be called only for CallbackQuery updates");
 			_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, text);
 		}
+	}
+
+	public class LeftTheChatException : Exception
+	{
+		public LeftTheChatException() : base("The chat was left") { }
 	}
 }
