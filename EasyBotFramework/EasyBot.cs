@@ -84,24 +84,25 @@ namespace YourEasyBot
 			taskInfo.Task = Task.Run(taskStarter).ContinueWith(t => taskInfo.Task = null);
 		}
 
-		public async Task<UpdateKind> NextEvent(UpdateInfo update)
+		public async Task<UpdateKind> NextEvent(UpdateInfo update, CancellationToken ct = default)
 		{
-			var newUpdate = await ((IGetNext)update).NextUpdate(_cancel.Token);
+			using var bothCT = CancellationTokenSource.CreateLinkedTokenSource(ct, _cancel.Token);
+			var newUpdate = await ((IGetNext)update).NextUpdate(bothCT.Token);
 			update.Message = newUpdate.Message;
 			update.CallbackData = newUpdate.CallbackData;
 			update.Update = newUpdate.Update;
 			return update.UpdateKind = newUpdate.UpdateKind;
 		}
 
-		public async Task<MsgCategory> NewMessage(UpdateInfo update)
+		public async Task<MsgCategory> NewMessage(UpdateInfo update, CancellationToken ct = default)
 		{
 			while (true)
 			{
-				switch (await NextEvent(update))
+				switch (await NextEvent(update, ct))
 				{
 					case UpdateKind.NewMessage
 						when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
-							return update.MsgCategory; // WaitNewMessage only returns for messages from these 3 categories
+							return update.MsgCategory; // NewMessage only returns for messages from these 3 categories
 					case UpdateKind.OtherUpdate
 						when update.Update.MyChatMember is ChatMemberUpdated
 						{ NewChatMember: { Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked } }:
@@ -110,9 +111,9 @@ namespace YourEasyBot
 			}
 		}
 
-		public async Task<string> NewTextMessage(UpdateInfo update)
+		public async Task<string> NewTextMessage(UpdateInfo update, CancellationToken ct = default)
 		{
-			while (await NewMessage(update) != MsgCategory.Text) { }
+			while (await NewMessage(update, ct) != MsgCategory.Text) { }
 			return update.Message.Text;
 		}
 
