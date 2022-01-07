@@ -1,6 +1,6 @@
 ﻿# EasyBot
 
-With this small framework based around [TelegramBots](https://github.com/TelegramBots/Telegram.Bot), you can easily write Console polling **Telegram bot**, in particular those that requires sequential inputs.
+With this small framework based around [Telegram.Bot](https://github.com/TelegramBots/Telegram.Bot), you can easily write Console polling **Telegram bot**, in particular those that requires sequential inputs.
 
 Here is an example bot asking sequential questions when the user sends **/start** in private chat:
 
