@@ -34,7 +34,12 @@ namespace YourEasyBot
 				// execution continues once we received a new text message
 				await Telegram.SendTextMessageAsync(chat, "What is your last name?");
 				var lastName = await NewTextMessage(update);
-				await Telegram.SendTextMessageAsync(chat, $"Welcome, {firstName} {lastName}!" +
+				var genderMsg = await Telegram.SendTextMessageAsync(chat, "What is your gender?", replyMarkup: new InlineKeyboardMarkup(new InlineKeyboardButton[]
+				{
+					new("Male") { CallbackData = "🚹" }, new("Female") { CallbackData = "🚺" }, new("Other") { CallbackData = "⚧" }
+				}));
+				var genderEmoji = await ButtonClicked(update, genderMsg);
+				await Telegram.SendTextMessageAsync(chat, $"Welcome, {firstName} {lastName}! ({genderEmoji})" +
 					$"\n\nFor more fun, try to type /button@{BotName} in a group I'm in");
 				return;
 			}

@@ -59,11 +59,14 @@ After you've done handling this update event, you can either:
 * return from your method.
   <br/>The method will be called again for future events concerning this chat.
 * or continue execution of your method and call:
-  * `await WaitNext(update)` to obtain the next sequential update event concerning the current chat
-  * `await WaitNewMessage(update)` to obtain the next new message in the current chat
+  * `await NextEvent(update)` to obtain the next sequential update event concerning the current chat
+  * `await NewMessage(update)` to obtain the next new message in the current chat
     <br/>*(this method return only real messages in categories Text, MediaOrDoc and StickerOrDice and ignore all other events; it will raise an exception to abort your method if the chat is left)*
-  * `await WaitNewTextMessage(update)` to obtain the next new text message in the current chat
+  * `await NewTextMessage(update)` to obtain the next new text message in the current chat
     *(same as above but keeps only Text messages)*
+  * `await ButtonClicked(update, msg)` to wait for the user to click a reply button (from the optional msg) and obtain its callback data
   * `ReplyCallback(update, "you clicked!")` to acknowledge the callback query and optionally display a text to the user
+
+After the above `await` calls, the `update` parameter is filled with the latest update event information.
 
 If you have questions about this EasyBot framework, you can contact me in [TelegramBots support group](https://t.me/joinchat/B35YY0QbLfd034CFnvCtCA).

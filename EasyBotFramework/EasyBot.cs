@@ -94,6 +94,26 @@ namespace YourEasyBot
 			return update.UpdateKind = newUpdate.UpdateKind;
 		}
 
+		public async Task<string> ButtonClicked(UpdateInfo update, Message msg, CancellationToken ct = default)
+		{
+			while (true)
+			{
+				switch (await NextEvent(update, ct))
+				{
+					case UpdateKind.CallbackQuery:
+						if (msg != null && update.Message.MessageId != msg.MessageId)
+							_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
+						else
+							return update.CallbackData;
+						continue;
+					case UpdateKind.OtherUpdate
+						when update.Update.MyChatMember is ChatMemberUpdated
+						{ NewChatMember: { Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked } }:
+						throw new LeftTheChatException(); // abort the calling method
+				}
+			}
+		}
+
 		public async Task<MsgCategory> NewMessage(UpdateInfo update, CancellationToken ct = default)
 		{
 			while (true)
