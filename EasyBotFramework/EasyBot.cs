@@ -94,7 +94,7 @@ namespace YourEasyBot
 			return update.UpdateKind = newUpdate.UpdateKind;
 		}
 
-		public async Task<string> ButtonClicked(UpdateInfo update, Message msg, CancellationToken ct = default)
+		public async Task<string> ButtonClicked(UpdateInfo update, Message msg = null, CancellationToken ct = default)
 		{
 			while (true)
 			{
