@@ -123,6 +123,9 @@ namespace YourEasyBot
 					case UpdateKind.NewMessage
 						when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
 							return update.MsgCategory; // NewMessage only returns for messages from these 3 categories
+					case UpdateKind.CallbackQuery:
+						_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
+						continue;
 					case UpdateKind.OtherUpdate
 						when update.Update.MyChatMember is ChatMemberUpdated
 						{ NewChatMember: { Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked } }:

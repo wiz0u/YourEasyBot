@@ -39,6 +39,7 @@ namespace YourEasyBot
 					new("Male") { CallbackData = "🚹" }, new("Female") { CallbackData = "🚺" }, new("Other") { CallbackData = "⚧" }
 				}));
 				var genderEmoji = await ButtonClicked(update, genderMsg);
+				ReplyCallback(update, "You clicked " + genderEmoji);
 				await Telegram.SendTextMessageAsync(chat, $"Welcome, {firstName} {lastName}! ({genderEmoji})" +
 					$"\n\nFor more fun, try to type /button@{BotName} in a group I'm in");
 				return;
