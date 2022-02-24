@@ -1,10 +1,12 @@
 ﻿#pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
 #pragma warning disable CS8604 // Possible null reference argument.
+using Newtonsoft.Json;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using static System.Threading.Tasks.Task;
+using File = System.IO.File;
 
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable MemberCanBeProtected.Global
@@ -16,14 +18,23 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
     readonly CancellationTokenSource cancel = new();
     readonly Dictionary<long, TaskInfo> tasks = new();
     public readonly TelegramBotClient Bot;
+    public string UnknownCommandResponse { get; set; } = "I don't know that command";
 
     public BotBase(string botToken)
     {
+        CommandHandler = new()
+        {
+            UnknownCommandHandler = async (ctx, _) => await Bot.SendTextMessageAsync(ctx.Chat, UnknownCommandResponse),
+            Prefix = '/',
+            WrongScopeCommandHandler = async (ctx, isPrivateChat) => await Bot.SendTextMessageAsync(ctx.Chat,
+                $"Sorry, I can't do that in {(isPrivateChat ? "Private" : "Group")} chat")
+        };
         Bot = new(botToken);
     }
 
     public User Me { get; private set; } = null!;
     public string BotName => Me.Username;
+    public CommandHandler CommandHandler { get; }
 
     public virtual Task OnPrivateChat(UpdateContext updateContext)
     {
@@ -57,7 +68,21 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         Console.WriteLine("Press Escape to stop the bot");
         while (true)
         {
-            var updates = await Bot.GetUpdatesAsync(messageOffset, timeout: 2);
+            Update[] updates;
+            try
+            {
+                updates = await Bot.GetUpdatesAsync(messageOffset, timeout: 2);
+            }
+            catch (Exception e)
+            {
+                var path = $"./Source/Logs/Error{DateTime.Now.Millisecond}.txt";
+                Console.WriteLine("Error acquired");
+                Console.WriteLine(e.Message);
+                Console.WriteLine($"Serialized error is saved to \"{path}\"");
+                await File.WriteAllTextAsync(path, JsonConvert.SerializeObject(e));
+                continue;
+            }
+
             foreach (var update in updates)
             {
                 if (update.Id < messageOffset)
@@ -138,9 +163,18 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
 
         Func<Task> taskStarter = chat?.Type switch
         {
-            ChatType.Private => () => OnPrivateChat(new(chat, message?.From, updateInfo)),
-            ChatType.Group or ChatType.Supergroup => () => OnGroupChat(new(chat, message?.From, updateInfo)),
-            ChatType.Channel => () => OnChannel(chat, updateInfo),
+            ChatType.Private or ChatType.Group or ChatType.Supergroup
+                when updateKind is UpdateKind.NewMessage
+                     && message.Text!.StartsWith(CommandHandler.Prefix)
+                => async () =>
+                    await CommandHandler.HandleCommand(new(chat, message?.From, updateInfo),
+                        chat.Type is ChatType.Private),
+            ChatType.Private
+                => () => OnPrivateChat(new(chat, message?.From, updateInfo)),
+            ChatType.Group or ChatType.Supergroup
+                => () => OnGroupChat(new(chat, message?.From, updateInfo)),
+            ChatType.Channel
+                => () => OnChannel(chat, updateInfo),
             _ => () => OnOtherEvents(updateInfo)
         };
         taskInfo.task = Task.Run(taskStarter).ContinueWith(_ => taskInfo.task = null!);
@@ -201,7 +235,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 case UpdateKind.CallbackQuery:
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException();
+                    throw new ArgumentOutOfRangeException(null);
             }
     }
 
