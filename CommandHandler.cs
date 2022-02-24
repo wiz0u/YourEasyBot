@@ -24,7 +24,7 @@ public class CommandHandler
     {
         var command = ctx.Update.Message.Text!.Split(' ');
         if (isPrivateChat ? IsPrivateChat(command[0]) : IsGroupChat(command[0]))
-            await (this[command[0].Remove(Prefix), isPrivateChat] ?? UnknownCommandHandler)
+            await (this[command[0], isPrivateChat] ?? UnknownCommandHandler)
                 .Invoke(ctx, command.Skip(1).ToArray());
         else
             await WrongScopeCommandHandler.Invoke(ctx, isPrivateChat);
