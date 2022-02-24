@@ -75,7 +75,9 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
             }
             catch (Exception e)
             {
-                var path = $"./Source/Logs/Error{DateTime.Now.Millisecond}.txt";
+                var path = Environment.GetEnvironmentVariable("TEMP") ?? Environment.GetEnvironmentVariable("TMP") ??
+                    Environment.GetEnvironmentVariable("TMPDIR") +
+                    $"/Error{DateTime.Now.Millisecond}.txt";
                 Console.WriteLine("Error acquired");
                 Console.WriteLine(e.Message);
                 Console.WriteLine($"Serialized error is saved to \"{path}\"");
