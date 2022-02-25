@@ -166,11 +166,14 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         Func<Task> taskStarter = chat?.Type switch
         {
             ChatType.Private or ChatType.Group or ChatType.Supergroup
-                when updateKind is UpdateKind.NewMessage
+                when updateKind is UpdateKind.NewMessage && message.Type is MessageType.Text
                      && message.Text!.StartsWith(CommandHandler.Prefix)
                 => async () =>
+                {
+                    // message.Text = message.Text!.Replace("@" + BotName, "");
                     await CommandHandler.HandleCommand(new(chat, message?.From, updateInfo),
-                        chat.Type is ChatType.Private),
+                        chat.Type is ChatType.Private, BotName);
+                },
             ChatType.Private
                 => () => OnPrivateChat(new(chat, message?.From, updateInfo)),
             ChatType.Group or ChatType.Supergroup
@@ -179,6 +182,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 => () => OnChannel(chat, updateInfo),
             _ => () => OnOtherEvents(updateInfo)
         };
+
         taskInfo.task = Task.Run(taskStarter).ContinueWith(_ => taskInfo.task = null!);
     }
 
@@ -192,7 +196,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         return update.UpdateKind = newUpdate.UpdateKind;
     }
 
-    public async Task<UpdateInfo> NewCallbackQuery(UpdateInfo update, Message? buttonedMessage = null,
+    public async Task<string> NewButtonClick(UpdateInfo update, Message? buttonedMessage = null,
         CancellationToken ct = default)
     {
         while (true)
@@ -201,7 +205,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
             {
                 case UpdateKind.CallbackQuery:
                     if (buttonedMessage is null || update.Message.MessageId == buttonedMessage.MessageId)
-                        return update;
+                        return update.CallbackData;
                     break;
                 case UpdateKind.OtherUpdate
                     when update.Update.MyChatMember is
