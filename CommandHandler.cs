@@ -13,24 +13,32 @@ public class CommandHandler
 
     // ReSharper disable once InconsistentNaming
     readonly Dictionary<string, Command> Commands = new(StringComparer.OrdinalIgnoreCase);
-    public char Prefix { get; set; }
+    public char Prefix { get; init; }
 
     public void Add(params Command[] commands)
     {
         foreach (var c in commands) Commands.Add(c.Name, c);
     }
 
-    public async Task HandleCommand(UpdateContext ctx, bool isPrivateChat)
+    public async Task HandleCommand(UpdateContext ctx, bool isPrivateChat, string botName)
     {
+        var msg = ctx.Update.Message.Text![1..];
+        if (msg.Contains("@" + botName) && msg.IndexOf('@') <
+            (msg.Contains(' ') ? msg.IndexOf(' ') : int.MaxValue))
+        {
+            ctx.Update.Message.Text =
+                msg.Remove(ctx.Update.Message.Text!.IndexOf('@'), botName.Length + 1);
+        }
+
         var command = ctx.Update.Message.Text!.Split(' ');
         if (isPrivateChat ? IsPrivateChat(command[0]) : IsGroupChat(command[0]))
-            await (this[command[0].Remove(Prefix), isPrivateChat] ?? UnknownCommandHandler)
+            await (GetHandler(command[0].Remove(Prefix), isPrivateChat) ?? UnknownCommandHandler)
                 .Invoke(ctx, command.Skip(1).ToArray());
         else
             await WrongScopeCommandHandler.Invoke(ctx, isPrivateChat);
     }
 
-    CommandHandlerFunc? this[string name, bool privateChat] =>
+    CommandHandlerFunc? GetHandler(string name, bool privateChat) =>
         IsAvailableCommand(name)
             ? privateChat ? Commands[name].PrivateChatHandler : Commands[name].GroupChatHandler
             : null;
