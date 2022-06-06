@@ -40,7 +40,7 @@ namespace YourEasyBot
 		{
 			await _taskInfo.Semaphore.WaitAsync(cancel);
 			UpdateInfo newUpdate;
-			lock (_taskInfo.Updates)
+			lock (_taskInfo)
 				newUpdate = _taskInfo.Updates.Dequeue();
 			return newUpdate;
 		}

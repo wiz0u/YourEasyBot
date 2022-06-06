@@ -31,7 +31,7 @@ namespace YourEasyBot
 			{
 				await Telegram.SendTextMessageAsync(chat, "What is your first name?");
 				var firstName = await NewTextMessage(update);
-				// execution continues once we received a new text message
+				// execution continues here once we received a new text message
 				await Telegram.SendTextMessageAsync(chat, "What is your last name?");
 				var lastName = await NewTextMessage(update);
 				var genderMsg = await Telegram.SendTextMessageAsync(chat, "What is your gender?", replyMarkup: new InlineKeyboardMarkup(new InlineKeyboardButton[]

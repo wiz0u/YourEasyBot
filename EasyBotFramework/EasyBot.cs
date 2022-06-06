@@ -67,21 +67,36 @@ namespace YourEasyBot
 			var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = updateKind, Update = update, Message = message };
 			if (update.Type is UpdateType.CallbackQuery)
 				updateInfo.CallbackData = update.CallbackQuery.Data;
-			if (taskInfo.Task != null)
-			{
-				lock (taskInfo.Updates)
+			lock (taskInfo)
+				if (taskInfo.Task != null)
+				{
 					taskInfo.Updates.Enqueue(updateInfo);
-				taskInfo.Semaphore.Release();
-				return;
-			}
+					taskInfo.Semaphore.Release();
+					return;
+				}
+			RunTask(taskInfo, updateInfo, chat);
+		}
+
+		private void RunTask(TaskInfo taskInfo, UpdateInfo updateInfo, Chat chat)
+		{
 			Func<Task> taskStarter = (chat?.Type) switch
 			{
-				ChatType.Private => () => OnPrivateChat(chat, message?.From, updateInfo),
+				ChatType.Private => () => OnPrivateChat(chat, updateInfo.Message?.From, updateInfo),
 				ChatType.Group or ChatType.Supergroup => () => OnGroupChat(chat, updateInfo),
 				ChatType.Channel => () => OnChannel(chat, updateInfo),
 				_ => () => OnOtherEvents(updateInfo),
 			};
-			taskInfo.Task = Task.Run(taskStarter).ContinueWith(t => taskInfo.Task = null);
+			taskInfo.Task = Task.Run(taskStarter).ContinueWith(async t =>
+			{
+				lock (taskInfo)
+					if (taskInfo.Semaphore.CurrentCount == 0)
+					{
+						taskInfo.Task = null;
+						return;
+					}
+				var newUpdate = await ((IGetNext)updateInfo).NextUpdate(_cancel.Token);
+				RunTask(taskInfo, newUpdate, chat);
+			});
 		}
 
 		public async Task<UpdateKind> NextEvent(UpdateInfo update, CancellationToken ct = default)
