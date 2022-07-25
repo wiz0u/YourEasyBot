@@ -6,7 +6,7 @@ using Telegram.Bot.Types.Enums;
 namespace YourEasyBot
 {
 	public enum UpdateKind { None, NewMessage, EditedMessage, CallbackQuery, OtherUpdate }
-	public enum MsgCategory { Other, Text, MediaOrDoc, StickerOrDice, Sharing, ChatStatus, VoiceChat }
+	public enum MsgCategory { Other, Text, MediaOrDoc, StickerOrDice, Sharing, ChatStatus, VideoChat }
 
 	public class UpdateInfo : IGetNext
 	{
@@ -29,8 +29,8 @@ namespace YourEasyBot
 			MessageType.MessagePinned or MessageType.ChatPhotoDeleted or MessageType.GroupCreated or MessageType.SupergroupCreated or
 			MessageType.ChannelCreated or MessageType.MigratedToSupergroup or MessageType.MigratedFromGroup
 			  => MsgCategory.ChatStatus,
-			MessageType.VoiceChatScheduled or MessageType.VoiceChatStarted or MessageType.VoiceChatEnded or MessageType.VoiceChatParticipantsInvited
-			  => MsgCategory.VoiceChat,
+			MessageType.VideoChatScheduled or MessageType.VideoChatStarted or MessageType.VideoChatEnded or MessageType.VideoChatParticipantsInvited
+			  => MsgCategory.VideoChat,
 			_ => MsgCategory.Other,
 		};
 
