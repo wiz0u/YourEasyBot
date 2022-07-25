@@ -155,11 +155,11 @@ namespace YourEasyBot
 			return update.Message.Text;
 		}
 
-		public void ReplyCallback(UpdateInfo update, string text = null)
+		public void ReplyCallback(UpdateInfo update, string text = null, bool showAlert = false, string url = null)
 		{
 			if (update.Update.Type != UpdateType.CallbackQuery)
 				throw new InvalidOperationException("This method can be called only for CallbackQuery updates");
-			_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, text);
+			_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, text, showAlert, url);
 		}
 	}
 
