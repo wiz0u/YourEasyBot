@@ -1,12 +1,10 @@
 ﻿#pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
 #pragma warning disable CS8604 // Possible null reference argument.
-using Newtonsoft.Json;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using static System.Threading.Tasks.Task;
-using File = System.IO.File;
 
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable MemberCanBeProtected.Global
@@ -61,6 +59,8 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         RunAsync().Wait();
     }
 
+    public Func<Exception, Task> ExceptionHandler { get; init; } = _ => CompletedTask;
+
     public async Task RunAsync()
     {
         Me = await Bot.GetMeAsync();
@@ -71,17 +71,11 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
             Update[] updates;
             try
             {
-                updates = await Bot.GetUpdatesAsync(messageOffset, timeout: 2);
+                updates = await Bot.GetUpdatesAsync(messageOffset, timeout: 5);
             }
             catch (Exception e)
             {
-                var path = Environment.GetEnvironmentVariable("TEMP") ?? Environment.GetEnvironmentVariable("TMP") ??
-                    Environment.GetEnvironmentVariable("TMPDIR") +
-                    $"/Error{DateTime.Now.Millisecond}.txt";
-                Console.WriteLine("Error acquired");
-                Console.WriteLine(e.Message);
-                Console.WriteLine($"Serialized error is saved to \"{path}\"");
-                await File.WriteAllTextAsync(path, JsonConvert.SerializeObject(e));
+                await ExceptionHandler(e);
                 continue;
             }
 
@@ -167,7 +161,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         {
             ChatType.Private or ChatType.Group or ChatType.Supergroup
                 when updateKind is UpdateKind.NewMessage && message.Type is MessageType.Text
-                     && message.Text!.StartsWith(CommandHandler.Prefix)
+                                                         && message.Text!.StartsWith(CommandHandler.Prefix)
                 => async () =>
                 {
                     // message.Text = message.Text!.Replace("@" + BotName, "");
