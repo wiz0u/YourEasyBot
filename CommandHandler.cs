@@ -33,7 +33,6 @@ public class CommandHandler
             ctx.Update.Message.Text =
                 msg.Remove(ctx.Update.Message.Text!.IndexOf('@'), botName.Length + 1);
         }
-
         var commandRaw = ctx.Update.Message.Text!.Split(' ');
         if (!Commands.TryGetValue(commandRaw[0], out var command))
         {
@@ -45,6 +44,7 @@ public class CommandHandler
             await CommandPrehandler(ctx, Commands[commandRaw[0]], commandRaw.Skip(1).ToArray());
         if (isPrivateChat ? command.AllowedInPrivateChats : command.AllowedInGroupChats)
             await GetHandler(commandRaw[0], isPrivateChat)!(ctx, commandRaw.Skip(1).ToArray());
+
         else
             await WrongScopeCommandHandler.Invoke(ctx, isPrivateChat);
     }
