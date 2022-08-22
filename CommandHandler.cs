@@ -9,6 +9,10 @@ public class CommandHandler
 
     public string? GetDescription(string command) => Commands[command].Description ?? null;
     public CommandHandlerFunc UnknownCommandHandler { get; set; } = (_, _) => Task.CompletedTask;
+
+    public Func<UpdateContext, Command, string[], Task> CommandPrehandler { get; set; } =
+        (_, _, _) => Task.CompletedTask;
+
     public Func<UpdateContext, bool, Task> WrongScopeCommandHandler { get; set; } = (_, _) => Task.CompletedTask;
 
     // ReSharper disable once InconsistentNaming
@@ -30,10 +34,17 @@ public class CommandHandler
                 msg.Remove(ctx.Update.Message.Text!.IndexOf('@'), botName.Length + 1);
         }
 
-        var command = ctx.Update.Message.Text!.Split(' ');
-        if (isPrivateChat ? IsPrivateChat(command[0]) : IsGroupChat(command[0]))
-            await (GetHandler(command[0], isPrivateChat) ?? UnknownCommandHandler)
-                .Invoke(ctx, command.Skip(1).ToArray());
+        var commandRaw = ctx.Update.Message.Text!.Split(' ');
+        if (!Commands.TryGetValue(commandRaw[0], out var command))
+        {
+            await UnknownCommandHandler(ctx, commandRaw.Skip(1).ToArray());
+            return;
+        }
+
+        if (command.NeedsPrehandling)
+            await CommandPrehandler(ctx, Commands[commandRaw[0]], commandRaw.Skip(1).ToArray());
+        if (isPrivateChat ? command.AllowedInPrivateChats : command.AllowedInGroupChats)
+            await GetHandler(commandRaw[0], isPrivateChat)!(ctx, commandRaw.Skip(1).ToArray());
         else
             await WrongScopeCommandHandler.Invoke(ctx, isPrivateChat);
     }

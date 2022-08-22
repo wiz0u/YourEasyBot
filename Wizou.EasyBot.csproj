@@ -1,13 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>Wizou &amp; SourCreamKun</Authors>
+    <Description>A framework to easily make telegram bots</Description>
+    <RepositoryUrl>https://github.com/SourCreamKun/Wizou.EasyBot</RepositoryUrl>
+    <PackageIconUrl>https://www.motormarkett.com/wp-content/uploads/2020/10/Telegram-icon-on-transparent-background-PNG.png</PackageIconUrl>
+    <PackageTags>Telegram Bot</PackageTags>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Telegram.Bot" Version="17.0.0" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Telegram.Bot" Version="17.0.0" />
+  </ItemGroup>
 
 </Project>

@@ -12,10 +12,11 @@ public class Command
     public bool AllowedInPrivateChats { get; }
     public CommandHandlerFunc? PrivateChatHandler { get; }
     public CommandHandlerFunc? GroupChatHandler { get; }
+    public bool NeedsPrehandling { get; set; }
 
     public Command(string name, CommandHandlerFunc? privateHandler = null, CommandHandlerFunc? groupHandler = null,
         bool allowedInGroupChats = false,
-        bool allowedInPrivateChats = true, string? description = null)
+        bool allowedInPrivateChats = true, bool needsPrehandling = false, string? description = null)
     {
         if (!allowedInGroupChats && !allowedInPrivateChats)
             throw new ArgumentException(
@@ -30,5 +31,6 @@ public class Command
         AllowedInGroupChats = allowedInGroupChats;
         AllowedInPrivateChats = allowedInPrivateChats;
         PrivateChatHandler = privateHandler;
+        NeedsPrehandling = needsPrehandling;
     }
 }

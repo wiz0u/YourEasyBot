@@ -4,9 +4,9 @@ namespace Wizou.EasyBot;
 
 public class UpdateContext
 {
-    public Chat Chat { get; set; }
-    public User User { get; set; }
-    public UpdateInfo Update { get; set; }
+    public Chat Chat { get; }
+    public User User { get; }
+    public UpdateInfo Update { get; }
 
     public UpdateContext(Chat chat, User user, UpdateInfo update)
     {
