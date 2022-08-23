@@ -3,6 +3,9 @@ using Telegram.Bot.Types.Enums;
 
 namespace Wizou.EasyBot;
 
+/// <summary>
+/// Shows the exact kind of update
+/// </summary>
 public enum UpdateKind
 {
     None,
@@ -20,21 +23,28 @@ public enum MsgCategory
     StickerOrDice,
     Sharing,
     ChatStatusChange,
-    VoiceChat
+    VideoChat
 }
 
+/// <summary>
+/// Update Information
+/// </summary>
 public class UpdateInfo : IUpdateGetter
 {
-    readonly TaskInfo taskInfo;
-    public string CallbackData;
-    public Message Message;
-    public Update Update;
+    readonly TaskInfo _taskInfo;
+    /// <summary>
+    /// CallBack Data
+    /// </summary>
+    public string CallbackData = null!;
+
+    /// <inheritdoc cref="Telegram.Bot.Types.Message"/>
+    public Message Message = null!;
+    /// <inheritdoc cref="Telegram.Bot.Types.Update"/>
+    public Update Update = null!;
+    /// <inheritdoc cref="Wizou.EasyBot.UpdateKind"/>
     public UpdateKind UpdateKind;
 
-    internal UpdateInfo(TaskInfo taskInfo)
-    {
-        this.taskInfo = taskInfo;
-    }
+    internal UpdateInfo(TaskInfo taskInfo) => _taskInfo = taskInfo;
 
     public MsgCategory MsgCategory => Message?.Type switch
     {
@@ -58,20 +68,20 @@ public class UpdateInfo : IUpdateGetter
             MessageType.ChannelCreated or MessageType.MigratedToSupergroup or MessageType.MigratedFromGroup
             => MsgCategory.ChatStatusChange,
 
-        MessageType.VoiceChatScheduled or MessageType.VoiceChatStarted or MessageType.VoiceChatEnded
-            or MessageType.VoiceChatParticipantsInvited
-            => MsgCategory.VoiceChat,
+        MessageType.VideoChatScheduled or MessageType.VideoChatStarted or MessageType.VideoChatEnded
+            or MessageType.VideoChatParticipantsInvited
+            => MsgCategory.VideoChat,
 
         _ => MsgCategory.Other
     };
 
     async Task<UpdateInfo> IUpdateGetter.NextUpdate(CancellationToken cancel)
     {
-        await taskInfo.semaphore.WaitAsync(cancel);
+        await _taskInfo.semaphore.WaitAsync(cancel);
         UpdateInfo newUpdate;
-        lock (taskInfo.updates)
+        lock (_taskInfo.updates)
         {
-            newUpdate = taskInfo.updates.Dequeue();
+            newUpdate = _taskInfo.updates.Dequeue();
         }
 
         return newUpdate;

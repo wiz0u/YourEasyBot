@@ -4,6 +4,9 @@ global using CommandHandlerFunc = System.Func<Wizou.EasyBot.UpdateContext, strin
 
 namespace Wizou.EasyBot;
 
+/// <summary>
+/// Represents a telegram bot command
+/// </summary>
 public class Command
 {
     public string Name { get; }

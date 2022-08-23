@@ -1,6 +1,7 @@
 ﻿#pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
 #pragma warning disable CS8604 // Possible null reference argument.
+using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -11,14 +12,29 @@ using static System.Threading.Tasks.Task;
 
 namespace Wizou.EasyBot;
 
+/// <summary>
+/// Derive from this class to create your simple bot
+/// </summary>
 public class BotBase // A fun way to code Telegram Bots, by Wizou
 {
-    readonly CancellationTokenSource cancel = new();
-    readonly Dictionary<long, TaskInfo> tasks = new();
+    readonly CancellationTokenSource _cancel = new();
+    readonly Dictionary<long, TaskInfo> _tasks = new();
+    /// <summary>
+    /// <see cref="TelegramBotClient"/> for sending Messages etc.
+    /// </summary>
     public readonly TelegramBotClient Bot;
+    public ILogger Logger { get; }
+
+    /// <summary>
+    /// Response for unknown commands
+    /// </summary>
     public string UnknownCommandResponse { get; set; } = "I don't know that command";
 
-    public BotBase(string botToken)
+    /// <summary>
+    /// Public base constructor that takes Bot Token for <see cref="TelegramBotClient"/> 
+    /// </summary>
+    /// <param name="botToken">Telegram Bot Token</param>
+    public BotBase(ILogger<BotBase> logger, string botToken)
     {
         CommandHandler = new()
         {
@@ -28,44 +44,66 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 $"Sorry, I can't do that in {(isPrivateChat ? "Private" : "Group")} chat")
         };
         Bot = new(botToken);
+        Logger = logger;
     }
-
+    /// <summary>
+    /// Basic information about Bot
+    /// </summary>
     public User Me { get; private set; } = null!;
+    /// <summary>
+    /// Your Bot's <see cref="User.Username"/>
+    /// </summary>
     public string BotName => Me.Username;
+    /// <summary>
+    /// A simple Command Handler
+    /// </summary>
     public CommandHandler CommandHandler { get; }
 
-    public virtual Task OnPrivateChat(UpdateContext updateContext)
-    {
-        return CompletedTask;
-    }
+    /// <summary>
+    /// When overriden Handles the updates in Private chats
+    /// </summary>
+    /// <param name="updateContext"></param>
+    /// <returns></returns>
+    public virtual Task OnPrivateChat(UpdateContext updateContext) => CompletedTask;
+    /// <summary>
+    /// When overriden Handles the updates in Group chats
+    /// </summary>
+    /// <param name="updateContext">Update event context</param>
+    /// <returns></returns>
+    public virtual Task OnGroupChat(UpdateContext updateContext) => CompletedTask;
+    /// <summary>
+    /// When overriden Handles the updates in Channels
+    /// </summary>
+    /// <param name="channel">Object that represents a channel</param>
+    /// <param name="update">Update event information</param>
+    /// <returns></returns>
+    public virtual Task OnChannel(Chat channel, UpdateInfo update) => CompletedTask;
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="update">Update event information</param>
+    /// <returns></returns>
+    public virtual Task OnOtherEvents(UpdateInfo update) => CompletedTask;
 
-    public virtual Task OnGroupChat(UpdateContext updateContext)
-    {
-        return CompletedTask;
-    }
+    /// <summary>
+    /// Synchronous version of <see cref="RunAsync"/>
+    /// </summary>
+    public void Run() => RunAsync().Wait();
 
-    public virtual Task OnChannel(Chat channel, UpdateInfo update)
-    {
-        return CompletedTask;
-    }
-
-    public virtual Task OnOtherEvents(UpdateInfo update)
-    {
-        return CompletedTask;
-    }
-
-    public void Run()
-    {
-        RunAsync().Wait();
-    }
-
+    /// <summary>
+    /// Delegate that handles the exceptions in update loop
+    /// </summary>
     public Func<Exception, Task> ExceptionHandler { get; init; } = _ => CompletedTask;
 
+    /// <summary>
+    /// Starts the bot
+    /// </summary>
+    /// <returns></returns>
     public async Task RunAsync()
     {
         Me = await Bot.GetMeAsync();
         var messageOffset = 0;
-        Console.WriteLine("Press Escape to stop the bot");
+        Logger.LogInformation("Press Escape to stop the bot");
         while (true)
         {
             Update[] updates;
@@ -121,12 +159,13 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 }
             }
 
-            if (!Console.KeyAvailable) continue;
+            if (!Console.KeyAvailable)
+                continue;
             if (Console.ReadKey().Key == ConsoleKey.Escape)
                 break;
         }
 
-        cancel.Cancel();
+        _cancel.Cancel();
     }
 
     void HandleUpdate(Update update, UpdateKind updateKind, Message message = null!, Chat chat = null!)
@@ -136,13 +175,13 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         // ReSharper disable ConstantConditionalAccessQualifier
         chat ??= message?.Chat!;
         var chatId = chat?.Id ?? 0;
-        lock (tasks)
+        lock (_tasks)
         {
-            if (!tasks.TryGetValue(chatId, out taskInfo!))
-                tasks[chatId] = taskInfo = new();
+            if (!_tasks.TryGetValue(chatId, out taskInfo!))
+                _tasks[chatId] = taskInfo = new();
         }
 
-        var updateInfo = new UpdateInfo(taskInfo) {UpdateKind = updateKind, Update = update, Message = message!};
+        var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = updateKind, Update = update, Message = message! };
         if (update.Type is UpdateType.CallbackQuery)
             updateInfo.CallbackData = update.CallbackQuery.Data!;
         // ReSharper disable once ConditionIsAlwaysTrueOrFalse
@@ -163,11 +202,8 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 when updateKind is UpdateKind.NewMessage && message.Type is MessageType.Text
                                                          && message.Text!.StartsWith(CommandHandler.Prefix)
                 => async () =>
-                {
-                    // message.Text = message.Text!.Replace("@" + BotName, "");
                     await CommandHandler.HandleCommand(new(chat, message?.From, updateInfo),
-                        chat.Type is ChatType.Private, BotName);
-                },
+                        chat.Type is ChatType.Private, BotName),
             ChatType.Private
                 => () => OnPrivateChat(new(chat, message?.From, updateInfo)),
             ChatType.Group or ChatType.Supergroup
@@ -180,21 +216,38 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         taskInfo.task = Task.Run(taskStarter).ContinueWith(_ => taskInfo.task = null!);
     }
 
+    /// <summary>
+    /// Returns the next update kind, and changes current update info to new one
+    /// </summary>
+    /// <param name="update"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
     public async Task<UpdateKind> NextEvent(UpdateInfo update, CancellationToken ct = default)
     {
-        using var bothCt = CancellationTokenSource.CreateLinkedTokenSource(ct, cancel.Token);
-        var newUpdate = await ((IUpdateGetter) update).NextUpdate(bothCt.Token);
+        using var bothCt = CancellationTokenSource.CreateLinkedTokenSource(ct, _cancel.Token);
+        var newUpdate = await ((IUpdateGetter)update).NextUpdate(bothCt.Token);
         update.Message = newUpdate.Message;
         update.CallbackData = newUpdate.CallbackData;
         update.Update = newUpdate.Update;
         return update.UpdateKind = newUpdate.UpdateKind;
     }
 
+    /// <summary>
+    /// Returns the next button click update ignoring others
+    /// </summary>
+    /// <param name="update">Update Information</param>
+    /// <param name="buttonedMessage">Message with attached buttons</param>
+    /// <param name="ct">Cancellation Token</param>
+    /// <returns>Clicked buttons Callback Data. <br/> If the task is canceled - null</returns>
+    /// <exception cref="LeftTheChatException">If user left the chat while wait</exception>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public async Task<string> NewButtonClick(UpdateInfo update, Message? buttonedMessage = null,
         CancellationToken ct = default)
     {
         while (true)
         {
+            if (ct.IsCancellationRequested)
+                return null;
             switch (await NextEvent(update, ct))
             {
                 case UpdateKind.CallbackQuery:
@@ -203,7 +256,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                     break;
                 case UpdateKind.OtherUpdate
                     when update.Update.MyChatMember is
-                        {NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked}:
+                    { NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
                     throw new LeftTheChatException();
                 default:
                     throw new ArgumentOutOfRangeException(null);
@@ -215,7 +268,14 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         }
     }
 
-
+    /// <summary>
+    /// Returns the next message category, and changes current update info to new one
+    /// </summary>
+    /// <param name="update"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    /// <exception cref="LeftTheChatException"></exception>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public async Task<MsgCategory> NewMessage(UpdateInfo update, CancellationToken ct = default)
     {
         while (true)
@@ -227,7 +287,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 case UpdateKind.OtherUpdate
                     when update.Update.MyChatMember is
                     {
-                        NewChatMember: {Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked}
+                        NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked
                     }:
                     throw new LeftTheChatException(); // abort the calling method
                 case UpdateKind.None:
@@ -239,14 +299,24 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
             }
     }
 
-
+    /// <summary>
+    /// Returns the next text message ignoring other kind of updates
+    /// </summary>
+    /// <param name="update"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
     public async Task<string> NewTextMessage(UpdateInfo update, CancellationToken ct = default)
     {
         while (await NewMessage(update, ct) != MsgCategory.Text)
             await Delay(1, CancellationToken.None);
         return update.Message.Text;
     }
-
+    /// <summary>
+    /// Replyes to the callback query
+    /// </summary>
+    /// <param name="update"></param>
+    /// <param name="text"></param>
+    /// <exception cref="InvalidOperationException"></exception>
     public void ReplyCallback(UpdateInfo update, string text = null!)
     {
         if (update.Update.Type != UpdateType.CallbackQuery)
@@ -255,8 +325,12 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
     }
 }
 
+/// <summary>
+/// Thrown when user lefts the chat
+/// </summary>
 public class LeftTheChatException : Exception
 {
+    /// <summary></summary>
     public LeftTheChatException() : base("The chat was left")
     {
     }

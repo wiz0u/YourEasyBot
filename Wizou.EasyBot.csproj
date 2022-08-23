@@ -10,10 +10,12 @@
     <RepositoryUrl>https://github.com/SourCreamKun/Wizou.EasyBot</RepositoryUrl>
     <PackageIconUrl>https://www.motormarkett.com/wp-content/uploads/2020/10/Telegram-icon-on-transparent-background-PNG.png</PackageIconUrl>
     <PackageTags>Telegram Bot</PackageTags>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Telegram.Bot" Version="17.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
+    <PackageReference Include="Telegram.Bot" Version="18.0.0" />
   </ItemGroup>
 
 </Project>
