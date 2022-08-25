@@ -67,41 +67,27 @@ public class UpdateInfo : IUpdateGetter
 	public UpdateKind UpdateKind;
 
 	internal UpdateInfo(TaskInfo taskInfo)
-	{
-		_taskInfo = taskInfo;
-	}
+		=> _taskInfo = taskInfo;
 
-	/// <inheritdoc cref="MsgCategory"/>
+	/// <inheritdoc cref="MsgCategory" />
 	public MsgCategory MsgCategory
 		=> Message.Type switch
-		{
-			MessageType.Text => MsgCategory.Text,
+		   {
+			   MessageType.Text => MsgCategory.Text,
 
-			MessageType.Photo or MessageType.Audio or MessageType.Video or MessageType.Voice or MessageType.Document
-				or MessageType.VideoNote
-				=> MsgCategory.MediaOrDoc,
+			   MessageType.Photo or MessageType.Audio or MessageType.Video or MessageType.Voice or MessageType.Document or MessageType.VideoNote => MsgCategory.MediaOrDoc,
 
-			MessageType.Sticker or MessageType.Dice
-				=> MsgCategory.StickerOrDice,
+			   MessageType.Sticker or MessageType.Dice => MsgCategory.StickerOrDice,
 
-			MessageType.Location or MessageType.Contact or MessageType.Venue or MessageType.Game or MessageType.Invoice
-				or
-				MessageType.SuccessfulPayment or MessageType.WebsiteConnected
-				=> MsgCategory.Sharing,
+			   MessageType.Location or MessageType.Contact or MessageType.Venue or MessageType.Game or MessageType.Invoice or MessageType.SuccessfulPayment or MessageType.WebsiteConnected => MsgCategory.Sharing,
 
-			MessageType.ChatMembersAdded or MessageType.ChatMemberLeft or MessageType.ChatTitleChanged
-				or MessageType.ChatPhotoChanged or
-				MessageType.MessagePinned or MessageType.ChatPhotoDeleted or MessageType.GroupCreated
-				or MessageType.SupergroupCreated or
-				MessageType.ChannelCreated or MessageType.MigratedToSupergroup or MessageType.MigratedFromGroup
-				=> MsgCategory.ChatStatusChange,
+			   MessageType.ChatMembersAdded or MessageType.ChatMemberLeft or MessageType.ChatTitleChanged or MessageType.ChatPhotoChanged or MessageType.MessagePinned or MessageType.ChatPhotoDeleted
+				   or MessageType.GroupCreated or MessageType.SupergroupCreated or MessageType.ChannelCreated or MessageType.MigratedToSupergroup or MessageType.MigratedFromGroup => MsgCategory.ChatStatusChange,
 
-			MessageType.VideoChatScheduled or MessageType.VideoChatStarted or MessageType.VideoChatEnded
-				or MessageType.VideoChatParticipantsInvited
-				=> MsgCategory.VideoChat,
+			   MessageType.VideoChatScheduled or MessageType.VideoChatStarted or MessageType.VideoChatEnded or MessageType.VideoChatParticipantsInvited => MsgCategory.VideoChat,
 
-			_ => MsgCategory.Other
-		};
+			   _ => MsgCategory.Other
+		   };
 
 	async Task<UpdateInfo> IUpdateGetter.NextUpdate(CancellationToken cancel)
 	{

@@ -15,27 +15,29 @@ public class Command
 	public delegate Task HandlerDelegate(UpdateContext ctx, string[] args);
 
 	/// <summary>
-	/// 
 	/// </summary>
 	/// <param name="name">Command name</param>
 	/// <param name="privateHandler">Delegate to handle command in private chat</param>
 	/// <param name="groupHandler">Delegate to handle command in group chat</param>
-	/// <param name="needsPreExecutionHandling">Boolean to show if command needs to be handled on <see cref="CommandHandler.OnCommandExecution"/> event (optional)</param>
+	/// <param name="needsPreExecutionHandling">
+	///     Boolean to show if command needs to be handled on
+	///     <see cref="CommandHandler.OnCommandExecution" /> event (optional)
+	/// </param>
 	/// <param name="description">Command description</param>
-	/// <exception cref="ArgumentException">When <paramref name="groupHandler"/> and <paramref name="privateHandler"/> are both null</exception>
+	/// <exception cref="ArgumentException">
+	///     When <paramref name="groupHandler" /> and <paramref name="privateHandler" /> are
+	///     both null
+	/// </exception>
 	/// <exception cref="ArgumentException">When command name is null, empty, or contains whitespaces </exception>
-	public Command(string name, HandlerDelegate? privateHandler = null, HandlerDelegate? groupHandler = null,
-		bool needsPreExecutionHandling = false, string? description = null)
+	public Command(string name, HandlerDelegate? privateHandler = null, HandlerDelegate? groupHandler = null, bool needsPreExecutionHandling = false, string? description = null)
 	{
 		var allowedInGroupChats = groupHandler is not null;
 		var allowedInPrivateChats = privateHandler is not null;
 		if (!allowedInGroupChats && !allowedInPrivateChats)
-			throw new ArgumentException(
-				"Command must have at least one working scope (private chat or/and group chat)");
+			throw new ArgumentException("Command must have at least one working scope (private chat or/and group chat)");
 		if (string.IsNullOrWhiteSpace(name) || name.Any(char.IsWhiteSpace))
 			throw new ArgumentException("Command name cannot be null, empty, or contain whitespaces");
-		GroupChatHandler = (groupHandler ?? privateHandler) ??
-		                   throw new ArgumentException("Both private and group chat handlers cannot be null");
+		GroupChatHandler = (groupHandler ?? privateHandler) ?? throw new ArgumentException("Both private and group chat handlers cannot be null");
 		Name = name;
 		Description = description;
 		AllowedInGroupChats = allowedInGroupChats;
@@ -75,7 +77,7 @@ public class Command
 	public HandlerDelegate? GroupChatHandler { get; }
 
 	/// <summary>
-	/// Optional property to show if command needs to be handled on <see cref="CommandHandler.OnCommandExecution"/> event
+	///     Optional property to show if command needs to be handled on <see cref="CommandHandler.OnCommandExecution" /> event
 	/// </summary>
 	public bool NeedsPreExecutionHandling { get; init; }
 }

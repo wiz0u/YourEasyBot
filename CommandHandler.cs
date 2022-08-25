@@ -12,9 +12,7 @@ public class CommandHandler
 	/// </summary>
 	/// <param name="prefix">Command's prefix</param>
 	public CommandHandler(char prefix)
-	{
-		Prefix = prefix;
-	}
+		=> Prefix = prefix;
 
 	/// <summary>
 	///     List of available commands
@@ -58,11 +56,7 @@ public class CommandHandler
 	/// <returns>Command Description if found; Otherwise <see langword="null" /></returns>
 	/// <exception cref="ArgumentException">If command with name <paramref name="cmdName" /> does not exist</exception>
 	public string? GetDescription(string cmdName)
-	{
-		return IsAvailableCommand(cmdName)
-			? _commands[cmdName].Description
-			: throw new ArgumentException($"No such command : {cmdName}", nameof(cmdName));
-	}
+		=> IsAvailableCommand(cmdName) ? _commands[cmdName].Description : throw new ArgumentException($"No such command : {cmdName}", nameof(cmdName));
 
 	/// <summary>
 	///     Sets the initial command set for the bot
@@ -74,19 +68,17 @@ public class CommandHandler
 		if (_commands.Any())
 			throw new InvalidOperationException("Commands are already set");
 		_commands = commands.Select(c =>
-		{
-			c.Name = EnsureSinglePrefixInName(c.Name);
-			return c;
-		}).ToDictionary(c => c.Name, c => c);
+		                            {
+			                            c.Name = EnsureSinglePrefixInName(c.Name);
+			                            return c;
+		                            }).ToDictionary(c => c.Name, c => c);
 	}
 
 	internal async Task HandleCommand(UpdateContext ctx, bool isPrivateChat, string botName)
 	{
 		var commandRaw = ctx.Update.Message.Text!.Split(' ');
 		var commandArgs = commandRaw.Skip(1).ToArray();
-		var commandName = commandRaw[0].Contains($"@{botName}")
-			? commandRaw[0].Replace($"@{botName}", string.Empty)
-			: commandRaw[0];
+		var commandName = commandRaw[0].Contains($"@{botName}") ? commandRaw[0].Replace($"@{botName}", string.Empty) : commandRaw[0];
 
 		if (!_commands.TryGetValue(commandName, out var command))
 		{
@@ -103,8 +95,7 @@ public class CommandHandler
 	}
 
 	Command.HandlerDelegate GetHandler(string name, bool privateChat)
-		=> (privateChat ? _commands[name].PrivateChatHandler : _commands[name].GroupChatHandler) ??
-		   throw new ArgumentException("Command not found", nameof(name));
+		=> (privateChat ? _commands[name].PrivateChatHandler : _commands[name].GroupChatHandler) ?? throw new ArgumentException("Command not found", nameof(name));
 
 	/// <summary>
 	///     Indicates if a command is allowed in private chats

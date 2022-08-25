@@ -7,20 +7,16 @@ namespace Wizou.EasyBot;
 /// </summary>
 public static class TelegramExtensions
 {
-    /// <summary>
-    ///     Gets the user's name
-    /// </summary>
-    /// <param name="user"></param>
-    /// <returns>
-    ///     <see cref="User.Username" /> if it is not <see langword="null" />; <see cref="User.FirstName" /> +
-    ///     <see cref="User.LastName" /> Otherwise
-    /// </returns>
-    public static string GetName(this User user)
-	{
-		return !string.IsNullOrEmpty(user.Username)
-			? "@" + user.Username
-			: (user.FirstName + " " + user.LastName).TrimEnd();
-	}
+	/// <summary>
+	///     Gets the user's name
+	/// </summary>
+	/// <param name="user"></param>
+	/// <returns>
+	///     <see cref="User.Username" /> if it is not <see langword="null" />; <see cref="User.FirstName" /> +
+	///     <see cref="User.LastName" /> Otherwise
+	/// </returns>
+	public static string GetName(this User user)
+		=> !string.IsNullOrEmpty(user.Username) ? "@" + user.Username : (user.FirstName + " " + user.LastName).TrimEnd();
 }
 
 class TaskInfo
