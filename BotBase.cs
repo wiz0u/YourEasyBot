@@ -1,7 +1,5 @@
-﻿#pragma warning disable CS8602 // Dereference of a possibly null reference.
-#pragma warning disable CS8603 // Possible null reference return.
-#pragma warning disable CS8604 // Possible null reference argument.
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -13,97 +11,128 @@ using static System.Threading.Tasks.Task;
 namespace Wizou.EasyBot;
 
 /// <summary>
-/// Derive from this class to create your simple bot
+///     Derive from this class to create your simple bot
 /// </summary>
-public class BotBase // A fun way to code Telegram Bots, by Wizou
+public class BotBase
 {
     readonly CancellationTokenSource _cancel = new();
     readonly Dictionary<long, TaskInfo> _tasks = new();
-    /// <summary>
-    /// <see cref="TelegramBotClient"/> for sending Messages etc.
-    /// </summary>
-    public readonly TelegramBotClient Bot;
-    public ILogger Logger { get; }
 
     /// <summary>
-    /// Response for unknown commands
+    ///     <see cref="TelegramBotClient" /> for sending Messages etc.
+    /// </summary>
+    public readonly TelegramBotClient Bot;
+
+    /// <summary>
+    ///     Public base constructor that takes Bot Token for <see cref="TelegramBotClient" />
+    /// </summary>
+    /// <param name="logger">A logger for your needs</param>
+    /// <param name="botToken">Telegram Bot Token</param>
+    // ReSharper disable once SuggestBaseTypeForParameterInConstructor
+    public BotBase(string botToken,ILogger<BotBase>? logger = null)
+    {
+        Bot = new(botToken);
+        Logger = logger;
+        CommandHandler = new('/');
+        CommandHandler.OnWrongScopeCommand += async (ctx, command, isPrivateChat)
+            =>
+        {
+            var scope = $"{(isPrivateChat ? "Private" : "Group")} chat";
+            await Bot.SendTextMessageAsync(ctx.Chat,
+                $"Sorry, I can't do {command.Name} in {scope}");
+            Logger?.LogWarning("{UserId} invoked command '{CommandName}' in wrong scope: {Scope} Context: {ctx}", ctx.User.Id, command.Name, scope, JsonConvert.SerializeObject(ctx));
+        };
+        CommandHandler.OnUnknownCommand +=
+            async (ctx, _) => await Bot.SendTextMessageAsync(ctx.Chat, UnknownCommandResponse);
+    }
+
+    /// <summary>
+    ///     An <see cref="ILogger" /> for your needs
+    /// </summary>
+    public ILogger? Logger { get; }
+
+    /// <summary>
+    ///     Response for unknown commands
     /// </summary>
     public string UnknownCommandResponse { get; set; } = "I don't know that command";
 
     /// <summary>
-    /// Public base constructor that takes Bot Token for <see cref="TelegramBotClient"/> 
-    /// </summary>
-    /// <param name="botToken">Telegram Bot Token</param>
-    public BotBase(ILogger<BotBase> logger, string botToken)
-    {
-        CommandHandler = new()
-        {
-            UnknownCommandHandler = async (ctx, _) => await Bot.SendTextMessageAsync(ctx.Chat, UnknownCommandResponse),
-            Prefix = '/',
-            WrongScopeCommandHandler = async (ctx, isPrivateChat) => await Bot.SendTextMessageAsync(ctx.Chat,
-                $"Sorry, I can't do that in {(isPrivateChat ? "Private" : "Group")} chat")
-        };
-        Bot = new(botToken);
-        Logger = logger;
-    }
-    /// <summary>
-    /// Basic information about Bot
+    ///     Basic information about Bot
     /// </summary>
     public User Me { get; private set; } = null!;
+
     /// <summary>
-    /// Your Bot's <see cref="User.Username"/>
+    ///     Your Bot's <see cref="User.Username" />
     /// </summary>
-    public string BotName => Me.Username;
+    public string BotName => Me.Username!;
+
     /// <summary>
-    /// A simple Command Handler
+    ///     A simple Command Handler
     /// </summary>
     public CommandHandler CommandHandler { get; }
 
     /// <summary>
-    /// When overriden Handles the updates in Private chats
+    ///     When overriden Handles the updates in Private chats
     /// </summary>
     /// <param name="updateContext"></param>
     /// <returns></returns>
-    public virtual Task OnPrivateChat(UpdateContext updateContext) => CompletedTask;
+    public virtual Task OnPrivateChat(UpdateContext updateContext)
+    {
+        return CompletedTask;
+    }
+
     /// <summary>
-    /// When overriden Handles the updates in Group chats
+    ///     When overriden Handles the updates in Group chats
     /// </summary>
     /// <param name="updateContext">Update event context</param>
     /// <returns></returns>
-    public virtual Task OnGroupChat(UpdateContext updateContext) => CompletedTask;
+    public virtual Task OnGroupChat(UpdateContext updateContext)
+    {
+        return CompletedTask;
+    }
+
     /// <summary>
-    /// When overriden Handles the updates in Channels
+    ///     When overriden Handles the updates in Channels
     /// </summary>
     /// <param name="channel">Object that represents a channel</param>
     /// <param name="update">Update event information</param>
     /// <returns></returns>
-    public virtual Task OnChannel(Chat channel, UpdateInfo update) => CompletedTask;
+    public virtual Task OnChannel(Chat channel, UpdateInfo update)
+    {
+        return CompletedTask;
+    }
+
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="update">Update event information</param>
     /// <returns></returns>
-    public virtual Task OnOtherEvents(UpdateInfo update) => CompletedTask;
+    public virtual Task OnOtherEvents(UpdateInfo update)
+    {
+        return CompletedTask;
+    }
 
     /// <summary>
-    /// Synchronous version of <see cref="RunAsync"/>
+    ///     Synchronous version of <see cref="RunAsync" />
     /// </summary>
-    public void Run() => RunAsync().Wait();
+    public void Run()
+    {
+        RunAsync().Wait();
+    }
 
     /// <summary>
-    /// Delegate that handles the exceptions in update loop
+    ///     Delegate that handles the exceptions in update loop
     /// </summary>
-    public Func<Exception, Task> ExceptionHandler { get; init; } = _ => CompletedTask;
+    public event Func<Exception, Task> OnException = _ => CompletedTask;
 
     /// <summary>
-    /// Starts the bot
+    ///     Starts the bot
     /// </summary>
     /// <returns></returns>
     public async Task RunAsync()
     {
         Me = await Bot.GetMeAsync();
         var messageOffset = 0;
-        Logger.LogInformation("Press Escape to stop the bot");
+        Logger?.LogInformation("Press Escape to stop the bot");
         while (true)
         {
             Update[] updates;
@@ -113,11 +142,11 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
             }
             catch (Exception e)
             {
-                await ExceptionHandler(e);
+                await OnException.Invoke(e);
                 continue;
             }
 
-            foreach (var update in updates)
+            foreach (Update update in updates)
             {
                 if (update.Id < messageOffset)
                     continue;
@@ -125,25 +154,25 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
                 switch (update.Type)
                 {
                     case UpdateType.Message:
-                        HandleUpdate(update, UpdateKind.NewMessage, update.Message);
+                        HandleUpdate(update, UpdateKind.NewMessage, update.Message!);
                         break;
                     case UpdateType.EditedMessage:
-                        HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage);
+                        HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage!);
                         break;
                     case UpdateType.ChannelPost:
-                        HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost);
+                        HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost!);
                         break;
                     case UpdateType.EditedChannelPost:
-                        HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost);
+                        HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost!);
                         break;
                     case UpdateType.CallbackQuery:
-                        HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery.Message);
+                        HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery!.Message!);
                         break;
                     case UpdateType.MyChatMember:
-                        HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember.Chat);
+                        HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember!.Chat);
                         break;
                     case UpdateType.ChatMember:
-                        HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember.Chat);
+                        HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember!.Chat);
                         break;
                     case UpdateType.Poll:
                     case UpdateType.Unknown:
@@ -168,12 +197,12 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
         _cancel.Cancel();
     }
 
-    void HandleUpdate(Update update, UpdateKind updateKind, Message message = null!, Chat chat = null!)
+    void HandleUpdate(Update update, UpdateKind updateKind, Message? message = null!, Chat? chat = null!)
     {
         TaskInfo taskInfo;
         // ReSharper disable once ConstantNullCoalescingCondition
         // ReSharper disable ConstantConditionalAccessQualifier
-        chat ??= message?.Chat!;
+        chat ??= message?.Chat;
         var chatId = chat?.Id ?? 0;
         lock (_tasks)
         {
@@ -183,41 +212,38 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
 
         var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = updateKind, Update = update, Message = message! };
         if (update.Type is UpdateType.CallbackQuery)
-            updateInfo.CallbackData = update.CallbackQuery.Data!;
+            updateInfo.CallbackData = update.CallbackQuery!.Data!;
         // ReSharper disable once ConditionIsAlwaysTrueOrFalse
-        if (taskInfo.task != null)
+        if (taskInfo._task != null)
         {
-            lock (taskInfo.updates)
+            lock (taskInfo._updates)
             {
-                taskInfo.updates.Enqueue(updateInfo);
+                taskInfo._updates.Enqueue(updateInfo);
             }
 
-            taskInfo.semaphore.Release();
+            taskInfo._semaphore.Release();
             return;
         }
 
         Func<Task> taskStarter = chat?.Type switch
         {
             ChatType.Private or ChatType.Group or ChatType.Supergroup
-                when updateKind is UpdateKind.NewMessage && message.Type is MessageType.Text
-                                                         && message.Text!.StartsWith(CommandHandler.Prefix)
-                => async () =>
-                    await CommandHandler.HandleCommand(new(chat, message?.From, updateInfo),
-                        chat.Type is ChatType.Private, BotName),
-            ChatType.Private
-                => () => OnPrivateChat(new(chat, message?.From, updateInfo)),
-            ChatType.Group or ChatType.Supergroup
-                => () => OnGroupChat(new(chat, message?.From, updateInfo)),
-            ChatType.Channel
-                => () => OnChannel(chat, updateInfo),
+                when updateKind is UpdateKind.NewMessage
+                     && message!.Type is MessageType.Text
+                     && message.Text!.StartsWith(CommandHandler.Prefix)
+                => async () => await CommandHandler.HandleCommand(new(chat, message?.From!, updateInfo),
+                    chat.Type is ChatType.Private, BotName),
+            ChatType.Private => () => OnPrivateChat(new(chat, message?.From!, updateInfo)),
+            ChatType.Group or ChatType.Supergroup => () => OnGroupChat(new(chat, message?.From!, updateInfo)),
+            ChatType.Channel => () => OnChannel(chat, updateInfo),
             _ => () => OnOtherEvents(updateInfo)
         };
 
-        taskInfo.task = Task.Run(taskStarter).ContinueWith(_ => taskInfo.task = null!);
+        taskInfo._task = Task.Run(taskStarter).ContinueWith(_ => taskInfo._task = null!);
     }
 
     /// <summary>
-    /// Returns the next update kind, and changes current update info to new one
+    ///     Returns the next update kind, and changes current update info to new one
     /// </summary>
     /// <param name="update"></param>
     /// <param name="ct"></param>
@@ -233,15 +259,15 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
     }
 
     /// <summary>
-    /// Returns the next button click update ignoring others
+    ///     Returns the next button click update ignoring others
     /// </summary>
     /// <param name="update">Update Information</param>
     /// <param name="buttonedMessage">Message with attached buttons</param>
     /// <param name="ct">Cancellation Token</param>
-    /// <returns>Clicked buttons Callback Data. <br/> If the task is canceled - null</returns>
+    /// <returns>Clicked buttons Callback Data. <br /> If the task is canceled - null</returns>
     /// <exception cref="LeftTheChatException">If user left the chat while wait</exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public async Task<string> NewButtonClick(UpdateInfo update, Message? buttonedMessage = null,
+    public async Task<string?> NewButtonClick(UpdateInfo update, Message? buttonedMessage = null,
         CancellationToken ct = default)
     {
         while (true)
@@ -269,7 +295,7 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
     }
 
     /// <summary>
-    /// Returns the next message category, and changes current update info to new one
+    ///     Returns the next message category, and changes current update info to new one
     /// </summary>
     /// <param name="update"></param>
     /// <param name="ct"></param>
@@ -300,19 +326,20 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
     }
 
     /// <summary>
-    /// Returns the next text message ignoring other kind of updates
+    ///     Returns the next text message ignoring other kind of updates
     /// </summary>
     /// <param name="update"></param>
     /// <param name="ct"></param>
     /// <returns></returns>
-    public async Task<string> NewTextMessage(UpdateInfo update, CancellationToken ct = default)
+    public async Task<string?> NewTextMessage(UpdateInfo update, CancellationToken ct = default)
     {
         while (await NewMessage(update, ct) != MsgCategory.Text)
             await Delay(1, CancellationToken.None);
         return update.Message.Text;
     }
+
     /// <summary>
-    /// Replyes to the callback query
+    ///     Replyes to the callback query
     /// </summary>
     /// <param name="update"></param>
     /// <param name="text"></param>
@@ -321,21 +348,15 @@ public class BotBase // A fun way to code Telegram Bots, by Wizou
     {
         if (update.Update.Type != UpdateType.CallbackQuery)
             throw new InvalidOperationException("This method can be called only for CallbackQuery updates");
-        _ = Bot.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, text);
+        _ = Bot.AnswerCallbackQueryAsync(update.Update.CallbackQuery!.Id, text);
     }
 }
 
 /// <summary>
-/// Thrown when user lefts the chat
+///     Thrown when user lefts the chat
 /// </summary>
 public class LeftTheChatException : Exception
 {
     /// <summary></summary>
-    public LeftTheChatException() : base("The chat was left")
-    {
-    }
+    public LeftTheChatException() : base("The chat was left") { }
 }
-
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-#pragma warning restore CS8603 // Possible null reference return.
-#pragma warning restore CS8604 // Possible null reference argument.

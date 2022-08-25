@@ -1,21 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Authors>Wizou &amp; SourCreamKun</Authors>
-    <Description>A framework to easily make telegram bots</Description>
-    <RepositoryUrl>https://github.com/SourCreamKun/Wizou.EasyBot</RepositoryUrl>
-    <PackageIconUrl>https://www.motormarkett.com/wp-content/uploads/2020/10/Telegram-icon-on-transparent-background-PNG.png</PackageIconUrl>
-    <PackageTags>Telegram Bot</PackageTags>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Authors>Wizou &amp; SourCreamKun</Authors>
+        <Description>A framework to easily make telegram bots</Description>
+        <RepositoryUrl>https://github.com/SourCreamKun/Wizou.EasyBot</RepositoryUrl>
+        <PackageIcon>icon.png</PackageIcon>
+        <PackageTags>Telegram Bot</PackageTags>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
-    <PackageReference Include="Telegram.Bot" Version="18.0.0" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1"/>
+        <PackageReference Include="Telegram.Bot" Version="18.0.0"/>
+        <None Include="icon.png" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 
 </Project>

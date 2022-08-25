@@ -1,62 +1,127 @@
-using System.Collections;
-
 namespace Wizou.EasyBot;
 
+/// <summary>
+///     Represents an object that handles commands
+/// </summary>
 public class CommandHandler
 {
-    public IEnumerable<string> AvailableCommands => _commands.Keys;
-    public bool IsAvailableCommand(string command) => _commands.ContainsKey(command);
+	Dictionary<string, Command> _commands = new(StringComparer.OrdinalIgnoreCase);
 
-    public string? GetDescription(string command) => _commands[command].Description ?? null;
-    public CommandHandlerFunc UnknownCommandHandler { get; set; } = (_, _) => Task.CompletedTask;
+	/// <summary>
+	///     Constructor that sets the commands prefix
+	/// </summary>
+	/// <param name="prefix">Command's prefix</param>
+	public CommandHandler(char prefix)
+	{
+		Prefix = prefix;
+	}
 
-    public Func<UpdateContext, Command, string[], Task> CommandPrehandler { get; set; } =
-        (_, _, _) => Task.CompletedTask;
+	/// <summary>
+	///     List of available commands
+	/// </summary>
+	public IEnumerable<string> AvailableCommands => _commands.Keys;
 
-    public Func<UpdateContext, bool, Task> WrongScopeCommandHandler { get; set; } = (_, _) => Task.CompletedTask;
+	/// <summary>
+	///     Commands prefix
+	/// </summary>
+	public char Prefix { get; }
 
-    // ReSharper disable once InconsistentNaming
-    readonly Dictionary<string, Command> _commands = new(StringComparer.OrdinalIgnoreCase);
-    public char Prefix { get; init; }
+	/// <summary>
+	///     Event that is fired when a unknown command is received
+	/// </summary>
+	public event Command.HandlerDelegate OnUnknownCommand = (_, _) => Task.CompletedTask;
 
-    public void Add(params Command[] commands)
-    {
-        foreach (var c in commands) _commands.Add(c.Name, c);
-    }
+	/// <summary>
+	///     Event that is fired when a command is called in wrong scope
+	/// </summary>
+	public event Func<UpdateContext, Command, bool, Task> OnWrongScopeCommand = (_, _, _) => Task.CompletedTask;
 
-    public async Task HandleCommand(UpdateContext ctx, bool isPrivateChat, string botName)
-    {
-        var msg = ctx.Update.Message.Text![1..];
-        if (msg.Contains("@" + botName) && msg.IndexOf('@') <
-            (msg.Contains(' ') ? msg.IndexOf(' ') : int.MaxValue))
-        {
-            ctx.Update.Message.Text =
-                ctx.Update.Message.Text.Remove(ctx.Update.Message.Text!.IndexOf('@'), botName.Length + 1);
-        }
-        var commandRaw = ctx.Update.Message.Text!.Split(' ');
-        if (!_commands.TryGetValue(commandRaw[0], out var command))
-        {
-            await UnknownCommandHandler(ctx, commandRaw.Skip(1).ToArray());
-            return;
-        }
+	/// <summary>
+	///     Event that is fired before command execution<br />
+	///     Note:<br />You can set for your commands <see cref="Command.NeedsPreExecutionHandling" /> property to indicate
+	///     weather you need to handle the command on this event or not
+	/// </summary>
+	public event Func<UpdateContext, Command, string[], Task> OnCommandExecution = (_, _, _) => Task.CompletedTask;
 
-        if (command.NeedsPrehandling)
-            await CommandPrehandler(ctx, _commands[commandRaw[0]], commandRaw.Skip(1).ToArray());
-        if (isPrivateChat ? command.AllowedInPrivateChats : command.AllowedInGroupChats)
-            await GetHandler(commandRaw[0], isPrivateChat)!(ctx, commandRaw.Skip(1).ToArray());
+	/// <summary>
+	///     Shows if command with name <paramref name="cmdName" /> is available
+	/// </summary>
+	/// <param name="cmdName">Name of the command</param>
+	/// <returns> <see langword="True" /> if command is defined; Otherwise <see langword="False" /></returns>
+	public bool IsAvailableCommand(string cmdName)
+		=> _commands.ContainsKey(cmdName);
 
-        else
-            await WrongScopeCommandHandler.Invoke(ctx, isPrivateChat);
-    }
+	/// <summary>
+	///     Gets the description of the command with name <paramref name="cmdName" />
+	/// </summary>
+	/// <param name="cmdName">Name of the command</param>
+	/// <returns>Command Description if found; Otherwise <see langword="null" /></returns>
+	/// <exception cref="ArgumentException">If command with name <paramref name="cmdName" /> does not exist</exception>
+	public string? GetDescription(string cmdName)
+	{
+		return IsAvailableCommand(cmdName)
+			? _commands[cmdName].Description
+			: throw new ArgumentException($"No such command : {cmdName}", nameof(cmdName));
+	}
 
-    CommandHandlerFunc? GetHandler(string name, bool privateChat) =>
-        IsAvailableCommand(name)
-            ? privateChat ? _commands[name].PrivateChatHandler : _commands[name].GroupChatHandler
-            : null;
+	/// <summary>
+	///     Sets the initial command set for the bot
+	/// </summary>
+	/// <param name="commands"></param>
+	/// <exception cref="InvalidOperationException">When commands are already set</exception>
+	public void SetCommands(params Command[] commands)
+	{
+		if (_commands.Any())
+			throw new InvalidOperationException("Commands are already set");
+		_commands = commands.Select(c =>
+		{
+			c.Name = EnsureSinglePrefixInName(c.Name);
+			return c;
+		}).ToDictionary(c => c.Name, c => c);
+	}
 
-    bool IsPrivateChat(string name)
-        => !IsAvailableCommand(name) || _commands[name].AllowedInPrivateChats;
+	internal async Task HandleCommand(UpdateContext ctx, bool isPrivateChat, string botName)
+	{
+		var commandRaw = ctx.Update.Message.Text!.Split(' ');
+		var commandArgs = commandRaw.Skip(1).ToArray();
+		var commandName = commandRaw[0].Contains($"@{botName}")
+			? commandRaw[0].Replace($"@{botName}", string.Empty)
+			: commandRaw[0];
 
-    bool IsGroupChat(string name)
-        => !IsAvailableCommand(name) || _commands[name].AllowedInGroupChats;
+		if (!_commands.TryGetValue(commandName, out var command))
+		{
+			await OnUnknownCommand(ctx, commandArgs);
+			return;
+		}
+
+		await OnCommandExecution(ctx, command, commandArgs);
+
+		if (isPrivateChat ? command.AllowedInPrivateChats : command.AllowedInGroupChats)
+			await GetHandler(commandName, isPrivateChat).Invoke(ctx, commandArgs);
+		else
+			await OnWrongScopeCommand.Invoke(ctx, command, isPrivateChat);
+	}
+
+	Command.HandlerDelegate GetHandler(string name, bool privateChat)
+		=> (privateChat ? _commands[name].PrivateChatHandler : _commands[name].GroupChatHandler) ??
+		   throw new ArgumentException("Command not found", nameof(name));
+
+	/// <summary>
+	///     Indicates if a command is allowed in private chats
+	/// </summary>
+	/// <param name="name">command name</param>
+	/// <returns><see langword="True" /> if allowed in private chats; <see langword="False" /> otherwise</returns>
+	public bool IsPrivateChatCommand(string name)
+		=> !IsAvailableCommand(name) || _commands[name].AllowedInPrivateChats;
+
+	/// <summary>
+	///     Indicates if a command is allowed in Group chats
+	/// </summary>
+	/// <param name="name">command name</param>
+	/// <returns><see langword="True" /> if allowed in Group chats; <see langword="False" /> otherwise</returns>
+	public bool IsGroupChatCommand(string name)
+		=> !IsAvailableCommand(name) || _commands[name].AllowedInGroupChats;
+
+	string EnsureSinglePrefixInName(string name)
+		=> $"{Prefix}{name.TrimStart(Prefix)}";
 }
