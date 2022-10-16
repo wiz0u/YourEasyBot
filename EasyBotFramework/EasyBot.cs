@@ -15,6 +15,7 @@ namespace YourEasyBot
 		public User Me { get; private set; }
 		public string BotName => Me.Username;
 
+		private int _lastUpdateId = -1;
 		private readonly CancellationTokenSource _cancel = new();
 		private readonly Dictionary<long, TaskInfo> _tasks = new();
 
@@ -23,37 +24,56 @@ namespace YourEasyBot
 		public virtual Task OnChannel(Chat channel, UpdateInfo update) => Task.CompletedTask;
 		public virtual Task OnOtherEvents(UpdateInfo update) => Task.CompletedTask;
 
-		public EasyBot(string botToken) => Telegram = new(botToken);
+		public EasyBot(string botToken)
+		{
+			Telegram = new(botToken);
+			Me = Task.Run(() => Telegram.GetMeAsync()).Result;
+		}
+
 		public void Run() => RunAsync().Wait();
 		public async Task RunAsync()
 		{
-			Me = await Telegram.GetMeAsync();
-			int messageOffset = 0;
 			Console.WriteLine("Press Escape to stop the bot");
 			while (true)
 			{
-				var updates = await Telegram.GetUpdatesAsync(messageOffset, timeout: 2);
+				var updates = await Telegram.GetUpdatesAsync(_lastUpdateId + 1, timeout: 2);
 				foreach (var update in updates)
-				{
-					if (update.Id < messageOffset) continue;
-					messageOffset = update.Id + 1;
-					switch (update.Type)
-					{
-						case UpdateType.Message: HandleUpdate(update, UpdateKind.NewMessage, update.Message); break;
-						case UpdateType.EditedMessage: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage); break;
-						case UpdateType.ChannelPost: HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost); break;
-						case UpdateType.EditedChannelPost: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost); break;
-						case UpdateType.CallbackQuery: HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery.Message); break;
-						case UpdateType.MyChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember.Chat); break;
-						case UpdateType.ChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember.Chat); break;
-						default: HandleUpdate(update, UpdateKind.OtherUpdate); break;
-					}
-				}
+					HandleUpdate(update);
 				if (Console.KeyAvailable)
 					if (Console.ReadKey().Key == ConsoleKey.Escape)
 						break;
 			}
 			_cancel.Cancel();
+		}
+
+		public async Task<string> CheckWebhook(string url)
+		{
+			var webhookInfo = await Telegram.GetWebhookInfoAsync();
+			string result = $"{BotName} is running";
+			if (webhookInfo.Url != url)
+			{
+				await Telegram.SetWebhookAsync(url);
+				result += " and now registered as Webhook";
+			}
+			return $"{result}\n\nLast webhook error: {webhookInfo.LastErrorDate} {webhookInfo.LastErrorMessage}";
+		}
+
+		/// <summary>Use this method in your WebHook controller</summary>
+		public void HandleUpdate(Update update)
+		{
+			if (update.Id <= _lastUpdateId) return;
+			_lastUpdateId = update.Id;
+			switch (update.Type)
+			{
+				case UpdateType.Message: HandleUpdate(update, UpdateKind.NewMessage, update.Message); break;
+				case UpdateType.EditedMessage: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage); break;
+				case UpdateType.ChannelPost: HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost); break;
+				case UpdateType.EditedChannelPost: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost); break;
+				case UpdateType.CallbackQuery: HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery.Message); break;
+				case UpdateType.MyChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember.Chat); break;
+				case UpdateType.ChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember.Chat); break;
+				default: HandleUpdate(update, UpdateKind.OtherUpdate); break;
+			}
 		}
 
 		private void HandleUpdate(Update update, UpdateKind updateKind, Message message = null, Chat chat = null)
