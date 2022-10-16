@@ -13,7 +13,7 @@ namespace YourEasyBot
 	 * 3.14 However this was written as fun project, it would not be reasonable to use it in serious company code
 	 */
 
-	internal class YourBot : EasyBot
+	public class YourBot : EasyBot
 	{
 		static void Main(string[] args)
 		{
