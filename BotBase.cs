@@ -15,6 +15,7 @@ namespace Wizou.EasyBot;
 /// </summary>
 public class BotBase
 {
+	private int _lastUpdateId = -1;
 	readonly CancellationTokenSource _cancel = new();
 	readonly Dictionary<long, TaskInfo> _tasks = new();
 
@@ -32,15 +33,16 @@ public class BotBase
 	public BotBase(string botToken, ILogger<BotBase>? logger = null)
 	{
 		Bot = new(botToken);
+		Me = Task.Run(() => Bot.GetMeAsync()).Result;
 		Logger = logger;
 		CommandHandler = new('/');
 		CommandHandler.OnWrongScopeCommand += async (ctx, command, isPrivateChat) =>
-		                                      {
-			                                      var scope = $"{(isPrivateChat ? "Private" : "Group")} chat";
-			                                      await Bot.SendTextMessageAsync(ctx.Chat, $"Sorry, I can't do {command.Name} in {scope}");
-			                                      Logger?.LogWarning("{UserId} invoked command '{CommandName}' in wrong scope: {Scope} Context: {ctx}",
-			                                                         ctx.User.Id, command.Name, scope, JsonConvert.SerializeObject(ctx));
-		                                      };
+											  {
+												  var scope = $"{(isPrivateChat ? "Private" : "Group")} chat";
+												  await Bot.SendTextMessageAsync(ctx.Chat, $"Sorry, I can't do {command.Name} in {scope}");
+												  Logger?.LogWarning("{UserId} invoked command '{CommandName}' in wrong scope: {Scope} Context: {ctx}",
+																	 ctx.User.Id, command.Name, scope, JsonConvert.SerializeObject(ctx));
+											  };
 		CommandHandler.OnUnknownCommand += async (ctx, _) => await Bot.SendTextMessageAsync(ctx.Chat, UnknownCommandResponse);
 	}
 
@@ -118,15 +120,13 @@ public class BotBase
 	/// <returns></returns>
 	public async Task RunAsync()
 	{
-		Me = await Bot.GetMeAsync();
-		var messageOffset = 0;
 		Logger?.LogInformation("Press Escape to stop the bot");
 		while (true)
 		{
 			Update[] updates;
 			try
 			{
-				updates = await Bot.GetUpdatesAsync(messageOffset, timeout: 5);
+				updates = await Bot.GetUpdatesAsync(_lastUpdateId + 1, timeout: 5);
 			}
 			catch (Exception e)
 			{
@@ -135,46 +135,7 @@ public class BotBase
 			}
 
 			foreach (var update in updates)
-			{
-				if (update.Id < messageOffset)
-					continue;
-				messageOffset = update.Id + 1;
-				switch (update.Type)
-				{
-					case UpdateType.Message:
-						HandleUpdate(update, UpdateKind.NewMessage, update.Message!);
-						break;
-					case UpdateType.EditedMessage:
-						HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage!);
-						break;
-					case UpdateType.ChannelPost:
-						HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost!);
-						break;
-					case UpdateType.EditedChannelPost:
-						HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost!);
-						break;
-					case UpdateType.CallbackQuery:
-						HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery!.Message!);
-						break;
-					case UpdateType.MyChatMember:
-						HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember!.Chat);
-						break;
-					case UpdateType.ChatMember:
-						HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember!.Chat);
-						break;
-					case UpdateType.Poll:
-					case UpdateType.Unknown:
-					case UpdateType.PollAnswer:
-					case UpdateType.InlineQuery:
-					case UpdateType.ShippingQuery:
-					case UpdateType.ChatJoinRequest:
-					case UpdateType.PreCheckoutQuery:
-					case UpdateType.ChosenInlineResult:
-					default:
-						HandleUpdate(update, UpdateKind.OtherUpdate);
-						break;
-				}
-			}
+				HandleUpdate(update);
 
 			if (!Console.KeyAvailable)
 				continue;
@@ -183,6 +144,61 @@ public class BotBase
 		}
 
 		_cancel.Cancel();
+	}
+
+	public async Task<string> CheckWebhook(string url)
+	{
+		var webhookInfo = await Telegram.GetWebhookInfoAsync();
+		string result = $"{BotName} is running";
+		if (webhookInfo.Url != url)
+		{
+			await Telegram.SetWebhookAsync(url);
+			result += " and now registered as Webhook";
+		}
+		return $"{result}\n\nLast webhook error: {webhookInfo.LastErrorDate} {webhookInfo.LastErrorMessage}";
+	}
+
+	/// <summary>Use this method in your WebHook controller</summary>
+	public void HandleUpdate(Update update)
+	{
+		if (update.Id < _lastUpdateId)
+			return;
+		_lastUpdateId = update.Id;
+		switch (update.Type)
+		{
+			case UpdateType.Message:
+				HandleUpdate(update, UpdateKind.NewMessage, update.Message!);
+				break;
+			case UpdateType.EditedMessage:
+				HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage!);
+				break;
+			case UpdateType.ChannelPost:
+				HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost!);
+				break;
+			case UpdateType.EditedChannelPost:
+				HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost!);
+				break;
+			case UpdateType.CallbackQuery:
+				HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery!.Message!);
+				break;
+			case UpdateType.MyChatMember:
+				HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember!.Chat);
+				break;
+			case UpdateType.ChatMember:
+				HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember!.Chat);
+				break;
+			case UpdateType.Poll:
+			case UpdateType.Unknown:
+			case UpdateType.PollAnswer:
+			case UpdateType.InlineQuery:
+			case UpdateType.ShippingQuery:
+			case UpdateType.ChatJoinRequest:
+			case UpdateType.PreCheckoutQuery:
+			case UpdateType.ChosenInlineResult:
+			default:
+				HandleUpdate(update, UpdateKind.OtherUpdate);
+				break;
+		}
 	}
 
 	void HandleUpdate(Update update, UpdateKind updateKind, Message? message = null!, Chat? chat = null!)
@@ -198,7 +214,7 @@ public class BotBase
 				_tasks[chatId] = taskInfo = new();
 		}
 
-		var updateInfo = new UpdateInfo(taskInfo) {UpdateKind = updateKind, Update = update, Message = message!};
+		var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = updateKind, Update = update, Message = message! };
 		if (update.Type is UpdateType.CallbackQuery)
 			updateInfo.CallbackData = update.CallbackQuery!.Data!;
 		// ReSharper disable once ConditionIsAlwaysTrueOrFalse
@@ -214,15 +230,15 @@ public class BotBase
 		}
 
 		Func<Task> taskStarter = chat?.Type switch
-		                         {
-			                         ChatType.Private or ChatType.Group or ChatType.Supergroup when updateKind is UpdateKind.NewMessage && message!.Type is MessageType.Text &&
-			                                                                                        message.Text!.StartsWith(CommandHandler.Prefix) => async ()
-				                         => await CommandHandler.HandleCommand(new(chat, message?.From!, updateInfo), chat.Type is ChatType.Private, BotName),
-			                         ChatType.Private => () => OnPrivateChat(new(chat, message?.From!, updateInfo)),
-			                         ChatType.Group or ChatType.Supergroup => () => OnGroupChat(new(chat, message?.From!, updateInfo)),
-			                         ChatType.Channel => () => OnChannel(chat, updateInfo),
-			                         _ => () => OnOtherEvents(updateInfo)
-		                         };
+		{
+			ChatType.Private or ChatType.Group or ChatType.Supergroup when updateKind is UpdateKind.NewMessage && message!.Type is MessageType.Text &&
+																		   message.Text!.StartsWith(CommandHandler.Prefix) => async ()
+				=> await CommandHandler.HandleCommand(new(chat, message?.From!, updateInfo), chat.Type is ChatType.Private, BotName),
+			ChatType.Private => () => OnPrivateChat(new(chat, message?.From!, updateInfo)),
+			ChatType.Group or ChatType.Supergroup => () => OnGroupChat(new(chat, message?.From!, updateInfo)),
+			ChatType.Channel => () => OnChannel(chat, updateInfo),
+			_ => () => OnOtherEvents(updateInfo)
+		};
 
 		taskInfo._task = Task.Run(taskStarter).ContinueWith(_ => taskInfo._task = null!);
 	}
@@ -236,7 +252,7 @@ public class BotBase
 	public async Task<UpdateKind> NextEvent(UpdateInfo update, CancellationToken ct = default)
 	{
 		using var bothCt = CancellationTokenSource.CreateLinkedTokenSource(ct, _cancel.Token);
-		var newUpdate = await ((IUpdateGetter) update).NextUpdate(bothCt.Token);
+		var newUpdate = await ((IUpdateGetter)update).NextUpdate(bothCt.Token);
 		update.Message = newUpdate.Message;
 		update.CallbackData = newUpdate.CallbackData;
 		update.Update = newUpdate.Update;
@@ -264,7 +280,7 @@ public class BotBase
 					if (buttonedMessage is null || update.Message.MessageId == buttonedMessage.MessageId)
 						return update.CallbackData;
 					break;
-				case UpdateKind.OtherUpdate when update.Update.MyChatMember is {NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked}:
+				case UpdateKind.OtherUpdate when update.Update.MyChatMember is { NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
 					throw new LeftTheChatException();
 				default:
 					throw new ArgumentOutOfRangeException(null);
@@ -292,9 +308,9 @@ public class BotBase
 				case UpdateKind.NewMessage when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
 					return update.MsgCategory; // NewMessage only returns for messages from these 3 categories
 				case UpdateKind.OtherUpdate when update.Update.MyChatMember is
-				                                 {
-					                                 NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked
-				                                 }:
+				{
+					NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked
+				}:
 					throw new LeftTheChatException(); // abort the calling method
 				case UpdateKind.None:
 				case UpdateKind.EditedMessage:
