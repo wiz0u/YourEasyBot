@@ -63,7 +63,7 @@ namespace YourEasyBot
 						break;
 					case UpdateKind.CallbackQuery:
 						Console.WriteLine($"{update.Message.From.Name()} clicked the button with data '{update.CallbackData}' on the msg: {update.Message.Text}");
-						ReplyCallback(update, "Wish granted !");
+						ReplyCallback(update, "Wish granted !", showAlert: true);
 						break;
 				}
 				// in this approach, we choose to continue execution in a loop, obtaining new updates/messages for this chat as they come

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
@@ -143,7 +142,7 @@ namespace YourEasyBot
 						continue;
 					case UpdateKind.OtherUpdate
 						when update.Update.MyChatMember is ChatMemberUpdated
-						{ NewChatMember: { Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked } }:
+						{ NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
 						throw new LeftTheChatException(); // abort the calling method
 				}
 			}
@@ -163,7 +162,7 @@ namespace YourEasyBot
 						continue;
 					case UpdateKind.OtherUpdate
 						when update.Update.MyChatMember is ChatMemberUpdated
-						{ NewChatMember: { Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked } }:
+						{ NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
 							throw new LeftTheChatException(); // abort the calling method
 				}
 			}
