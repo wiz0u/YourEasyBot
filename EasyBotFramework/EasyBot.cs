@@ -62,15 +62,23 @@ namespace YourEasyBot
 		{
 			if (update.Id <= _lastUpdateId) return;
 			_lastUpdateId = update.Id;
-			switch (update.Type)
+			switch (update)
 			{
-				case UpdateType.Message: HandleUpdate(update, UpdateKind.NewMessage, update.Message); break;
-				case UpdateType.EditedMessage: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedMessage); break;
-				case UpdateType.ChannelPost: HandleUpdate(update, UpdateKind.NewMessage, update.ChannelPost); break;
-				case UpdateType.EditedChannelPost: HandleUpdate(update, UpdateKind.EditedMessage, update.EditedChannelPost); break;
-				case UpdateType.CallbackQuery: HandleUpdate(update, UpdateKind.CallbackQuery, update.CallbackQuery.Message); break;
-				case UpdateType.MyChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.MyChatMember.Chat); break;
-				case UpdateType.ChatMember: HandleUpdate(update, UpdateKind.OtherUpdate, chat: update.ChatMember.Chat); break;
+				case { Message: { } m }: HandleUpdate(update, UpdateKind.NewMessage, m); break;
+				case { EditedMessage: { } em }: HandleUpdate(update, UpdateKind.EditedMessage, em); break;
+				case { ChannelPost: { } cp }: HandleUpdate(update, UpdateKind.NewMessage, cp); break;
+				case { EditedChannelPost: { } ecp }: HandleUpdate(update, UpdateKind.EditedMessage, ecp); break;
+				case { BusinessMessage: { } bm }: HandleUpdate(update, UpdateKind.NewMessage, bm); break;
+				case { EditedBusinessMessage: { } ebm }: HandleUpdate(update, UpdateKind.EditedMessage, ebm); break;
+				case { CallbackQuery: { } cq }: HandleUpdate(update, UpdateKind.CallbackQuery, cq.Message); break;
+				case { MyChatMember: { } mcm }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: mcm.Chat); break;
+				case { ChatMember: { } cm }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: cm.Chat); break;
+				case { ChatJoinRequest: { } cjr }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: cjr.Chat); break;
+				case { MessageReaction: { } mr }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: mr.Chat); break;
+				case { MessageReactionCount: { } mrc }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: mrc.Chat); break;
+				case { ChatBoost: { } cb }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: cb.Chat); break;
+				case { RemovedChatBoost: { } rcb }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: rcb.Chat); break;
+				case { DeletedBusinessMessages: { } dbm }: HandleUpdate(update, UpdateKind.OtherUpdate, chat: dbm.Chat); break;
 				default: HandleUpdate(update, UpdateKind.OtherUpdate); break;
 			}
 		}
@@ -84,8 +92,8 @@ namespace YourEasyBot
 				if (!_tasks.TryGetValue(chatId, out taskInfo))
 					_tasks[chatId] = taskInfo = new TaskInfo();
 			var updateInfo = new UpdateInfo(taskInfo) { UpdateKind = updateKind, Update = update, Message = message };
-			if (update.Type is UpdateType.CallbackQuery)
-				updateInfo.CallbackData = update.CallbackQuery.Data;
+			if (update is { CallbackQuery: { } cq })
+				updateInfo.CallbackData = cq.Data;
 			lock (taskInfo)
 				if (taskInfo.Task != null)
 				{
@@ -141,8 +149,7 @@ namespace YourEasyBot
 							return update.CallbackData;
 						continue;
 					case UpdateKind.OtherUpdate
-						when update.Update.MyChatMember is ChatMemberUpdated
-						{ NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
+					when update.Update.MyChatMember is { NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
 						throw new LeftTheChatException(); // abort the calling method
 				}
 			}
@@ -155,15 +162,14 @@ namespace YourEasyBot
 				switch (await NextEvent(update, ct))
 				{
 					case UpdateKind.NewMessage
-						when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
-							return update.MsgCategory; // NewMessage only returns for messages from these 3 categories
+					when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
+						return update.MsgCategory; // NewMessage only returns for messages from these 3 categories
 					case UpdateKind.CallbackQuery:
 						_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
 						continue;
 					case UpdateKind.OtherUpdate
-						when update.Update.MyChatMember is ChatMemberUpdated
-						{ NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
-							throw new LeftTheChatException(); // abort the calling method
+					when update.Update.MyChatMember is { NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
+						throw new LeftTheChatException(); // abort the calling method
 				}
 			}
 		}
@@ -176,7 +182,7 @@ namespace YourEasyBot
 
 		public void ReplyCallback(UpdateInfo update, string text = null, bool showAlert = false, string url = null)
 		{
-			if (update.Update.Type != UpdateType.CallbackQuery)
+			if (update.Update is not { CallbackQuery: { } })
 				throw new InvalidOperationException("This method can be called only for CallbackQuery updates");
 			_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, text, showAlert, url);
 		}
