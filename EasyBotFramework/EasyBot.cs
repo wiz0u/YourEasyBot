@@ -16,7 +16,7 @@ namespace YourEasyBot
 
 		private int _lastUpdateId = -1;
 		private readonly CancellationTokenSource _cancel = new();
-		private readonly Dictionary<long, TaskInfo> _tasks = new();
+		private readonly Dictionary<long, TaskInfo> _tasks = [];
 
 		public virtual Task OnPrivateChat(Chat chat, User user, UpdateInfo update) => Task.CompletedTask;
 		public virtual Task OnGroupChat(Chat chat, UpdateInfo update) => Task.CompletedTask;
@@ -26,7 +26,7 @@ namespace YourEasyBot
 		public EasyBot(string botToken)
 		{
 			Telegram = new(botToken);
-			Me = Task.Run(() => Telegram.GetMeAsync()).Result;
+			Me = Task.Run(() => Telegram.GetMe()).Result;
 		}
 
 		public void Run() => RunAsync().Wait();
@@ -35,7 +35,7 @@ namespace YourEasyBot
 			Console.WriteLine("Press Escape to stop the bot");
 			while (true)
 			{
-				var updates = await Telegram.GetUpdatesAsync(_lastUpdateId + 1, timeout: 2);
+				var updates = await Telegram.GetUpdates(_lastUpdateId + 1, timeout: 2);
 				foreach (var update in updates)
 					HandleUpdate(update);
 				if (Console.KeyAvailable)
@@ -47,11 +47,11 @@ namespace YourEasyBot
 
 		public async Task<string> CheckWebhook(string url)
 		{
-			var webhookInfo = await Telegram.GetWebhookInfoAsync();
+			var webhookInfo = await Telegram.GetWebhookInfo();
 			string result = $"{BotName} is running";
 			if (webhookInfo.Url != url)
 			{
-				await Telegram.SetWebhookAsync(url);
+				await Telegram.SetWebhook(url);
 				result += " and now registered as Webhook";
 			}
 			return $"{result}\n\nLast webhook error: {webhookInfo.LastErrorDate} {webhookInfo.LastErrorMessage}";
@@ -144,7 +144,7 @@ namespace YourEasyBot
 				{
 					case UpdateKind.CallbackQuery:
 						if (msg != null && update.Message.MessageId != msg.MessageId)
-							_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
+							_ = Telegram.AnswerCallbackQuery(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
 						else
 							return update.CallbackData;
 						continue;
@@ -165,7 +165,7 @@ namespace YourEasyBot
 					when update.MsgCategory is MsgCategory.Text or MsgCategory.MediaOrDoc or MsgCategory.StickerOrDice:
 						return update.MsgCategory; // NewMessage only returns for messages from these 3 categories
 					case UpdateKind.CallbackQuery:
-						_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
+						_ = Telegram.AnswerCallbackQuery(update.Update.CallbackQuery.Id, null, cancellationToken: ct);
 						continue;
 					case UpdateKind.OtherUpdate
 					when update.Update.MyChatMember is { NewChatMember.Status: ChatMemberStatus.Left or ChatMemberStatus.Kicked }:
@@ -184,7 +184,7 @@ namespace YourEasyBot
 		{
 			if (update.Update is not { CallbackQuery: { } })
 				throw new InvalidOperationException("This method can be called only for CallbackQuery updates");
-			_ = Telegram.AnswerCallbackQueryAsync(update.Update.CallbackQuery.Id, text, showAlert, url);
+			_ = Telegram.AnswerCallbackQuery(update.Update.CallbackQuery.Id, text, showAlert, url);
 		}
 	}
 

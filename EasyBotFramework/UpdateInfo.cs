@@ -23,11 +23,11 @@ namespace YourEasyBot
 			MessageType.Sticker or MessageType.Dice
 			  => MsgCategory.StickerOrDice,
 			MessageType.Location or MessageType.Contact or MessageType.Venue or MessageType.Game or MessageType.Invoice or
-			MessageType.SuccessfulPayment or MessageType.WebsiteConnected
+			MessageType.SuccessfulPayment or MessageType.ConnectedWebsite
 			  => MsgCategory.Sharing,
-			MessageType.ChatMembersAdded or MessageType.ChatMemberLeft or MessageType.ChatTitleChanged or MessageType.ChatPhotoChanged or
-			MessageType.MessagePinned or MessageType.ChatPhotoDeleted or MessageType.GroupCreated or MessageType.SupergroupCreated or
-			MessageType.ChannelCreated or MessageType.MigratedToSupergroup or MessageType.MigratedFromGroup
+			MessageType.NewChatMembers or MessageType.LeftChatMember or MessageType.NewChatTitle or MessageType.NewChatPhoto or
+			MessageType.PinnedMessage or MessageType.DeleteChatPhoto or MessageType.GroupChatCreated or MessageType.SupergroupChatCreated or
+			MessageType.ChannelChatCreated or MessageType.MigrateToChatId or MessageType.MigrateFromChatId
 			  => MsgCategory.ChatStatus,
 			MessageType.VideoChatScheduled or MessageType.VideoChatStarted or MessageType.VideoChatEnded or MessageType.VideoChatParticipantsInvited
 			  => MsgCategory.VideoChat,

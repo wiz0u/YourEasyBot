@@ -13,7 +13,7 @@ namespace YourEasyBot
 	 * 3.14 However this was written as fun project, it would not be reasonable to use it in serious company code
 	 */
 
-	public class YourBot : EasyBot
+	public class YourBot(string botToken) : EasyBot(botToken)
 	{
 		static void Main(string[] args)
 		{
@@ -21,26 +21,24 @@ namespace YourEasyBot
 			bot.Run();
 		}
 
-		public YourBot(string botToken) : base(botToken) { }
-
 		public override async Task OnPrivateChat(Chat chat, User user, UpdateInfo update)
 		{
 			if (update.UpdateKind != UpdateKind.NewMessage || update.MsgCategory != MsgCategory.Text)
 				return;
 			if (update.Message.Text == "/start")
 			{
-				await Telegram.SendTextMessageAsync(chat, "What is your first name?");
+				await Telegram.SendMessage(chat, "What is your first name?");
 				var firstName = await NewTextMessage(update);
 				// execution continues here once we received a new text message
-				await Telegram.SendTextMessageAsync(chat, "What is your last name?");
+				await Telegram.SendMessage(chat, "What is your last name?");
 				var lastName = await NewTextMessage(update);
-				var genderMsg = await Telegram.SendTextMessageAsync(chat, "What is your gender?", replyMarkup: new InlineKeyboardMarkup(new InlineKeyboardButton[]
+				var genderMsg = await Telegram.SendMessage(chat, "What is your gender?", replyMarkup: new InlineKeyboardMarkup(new InlineKeyboardButton[]
 				{
 					new("Male") { CallbackData = "🚹" }, new("Female") { CallbackData = "🚺" }, new("Other") { CallbackData = "⚧" }
 				}));
 				var genderEmoji = await ButtonClicked(update, genderMsg);
 				ReplyCallback(update, "You clicked " + genderEmoji);
-				await Telegram.SendTextMessageAsync(chat, $"Welcome, {firstName} {lastName}! ({genderEmoji})" +
+				await Telegram.SendMessage(chat, $"Welcome, {firstName} {lastName}! ({genderEmoji})" +
 					$"\n\nFor more fun, try to type /button@{BotName} in a group I'm in");
 				return;
 			}
@@ -56,7 +54,7 @@ namespace YourEasyBot
 					case UpdateKind.NewMessage:
 						Console.WriteLine($"{update.Message.From.Name()} wrote: {update.Message.Text}");
 						if (update.Message.Text == "/button@" + BotName)
-							await Telegram.SendTextMessageAsync(chat, "You summoned me!", replyMarkup: new InlineKeyboardMarkup("I grant your wish"));
+							await Telegram.SendMessage(chat, "You summoned me!", replyMarkup: new InlineKeyboardMarkup("I grant your wish"));
 						break;
 					case UpdateKind.EditedMessage:
 						Console.WriteLine($"{update.Message.From.Name()} edited: {update.Message.Text}");
